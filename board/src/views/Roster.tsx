@@ -228,6 +228,22 @@ function StudentBoard({
 }) {
   const [idx, setIdx] = useState(0);
   const sub = submissions[Math.min(idx, submissions.length - 1)] ?? null;
+  // A submission's payload comes off the wire tagged mode: "submission" (see
+  // submit.py's build_envelope) — that mode intentionally has canAnnotate
+  // false in App.tsx (a plain roster view has nothing to comment INTO). Once
+  // the instructor drills into one student's board, this IS a hosted-comment
+  // experience in every way that matters: the instructor types a name once,
+  // selects text, and posts through the exact same /api/comments flow a
+  // --publish-web collaborator uses — the classroom server's api/comments.ts
+  // just scopes storage by shareHash instead of by (single) deployment.
+  // Overriding mode here, rather than adding "submission" to App.tsx's
+  // canAnnotate list, reuses ALL of that existing hosted-mode machinery
+  // (fetch/post wiring, reviewer-name persistence, save-state banners)
+  // unmodified.
+  const boardData = useMemo(
+    () => (sub ? { ...sub.payload, mode: "hosted" as const } : null),
+    [sub],
+  );
 
   return (
     <>
@@ -268,8 +284,8 @@ function StudentBoard({
           </div>
         )}
       </div>
-      {sub ? (
-        <App data={sub.payload} />
+      {sub && boardData ? (
+        <App data={boardData} />
       ) : (
         <div className="flex min-h-screen items-center justify-center bg-stone-50 dark:bg-stone-950">
           <p className="text-sm text-stone-500 dark:text-stone-400">
@@ -447,8 +463,18 @@ export default function Roster({ data }: { data: RosterData }) {
                       </td>
                       <td className="px-4 py-2.5">
                         {sub ? (
-                          <span className="text-stone-600 dark:text-stone-400">
-                            {fmtDate(sub.submittedAt)}
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="text-stone-600 dark:text-stone-400">
+                              {fmtDate(sub.submittedAt)}
+                            </span>
+                            {row.isNewSinceLastView && (
+                              <span
+                                className="rounded-full border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300"
+                                title="Submitted since your last visit to this dashboard"
+                              >
+                                new
+                              </span>
+                            )}
                           </span>
                         ) : (
                           <span className="text-xs text-stone-400 dark:text-stone-500">

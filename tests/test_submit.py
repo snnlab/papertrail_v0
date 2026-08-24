@@ -306,6 +306,117 @@ class TestClassroomConfig(unittest.TestCase):
             self.assertEqual(mode, 0o600)
 
 
+class TestCommentCheck(unittest.TestCase):
+    def setUp(self):
+        self._orig_data = os.environ.get("CLAUDE_PLUGIN_DATA")
+        self._orig_urlopen = submit.urllib.request.urlopen
+
+    def tearDown(self):
+        if self._orig_data is None:
+            os.environ.pop("CLAUDE_PLUGIN_DATA", None)
+        else:
+            os.environ["CLAUDE_PLUGIN_DATA"] = self._orig_data
+        submit.urllib.request.urlopen = self._orig_urlopen
+
+    def _fake_urlopen(self, code, body):
+        class _Resp:
+            def __enter__(self_inner):
+                return self_inner
+
+            def __exit__(self_inner, *a):
+                return False
+
+            def getcode(self_inner):
+                return code
+
+            def read(self_inner):
+                return json.dumps(body).encode("utf-8")
+        return lambda req, timeout=30: _Resp()
+
+    def test_fetch_comments_never_raises_on_network_error(self):
+        import urllib.error
+
+        def raise_conn(req, timeout=30):
+            raise urllib.error.URLError("connection refused")
+        submit.urllib.request.urlopen = raise_conn
+        self.assertEqual(submit.fetch_comments("https://cls.example.edu", "tok", "abc123"), [])
+
+    def test_fetch_comments_sends_bearer_token_and_scoped_query(self):
+        captured = {}
+
+        class _Resp:
+            def __enter__(self_inner):
+                return self_inner
+
+            def __exit__(self_inner, *a):
+                return False
+
+            def getcode(self_inner):
+                return 200
+
+            def read(self_inner):
+                return json.dumps({"comments": []}).encode("utf-8")
+
+        def fake_urlopen(req, timeout=30):
+            captured["url"] = req.full_url
+            captured["auth"] = req.get_header("Authorization")
+            return _Resp()
+        submit.urllib.request.urlopen = fake_urlopen
+        submit.fetch_comments("https://cls.example.edu", "tok-xyz", "abc 123")
+        self.assertEqual(captured["auth"], "Bearer tok-xyz")
+        self.assertIn("shareHash=abc%20123", captured["url"])
+
+    def test_check_for_new_comments_prints_and_marks_seen_once(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            make_project(root)
+            os.environ["CLAUDE_PLUGIN_DATA"] = str(root / "data")
+            comments = [{
+                "id": "c1", "author": "Prof. Kim", "receivedAt": "2026-08-25T02:00:00.000Z",
+                "annotation": {"type": "general", "comment": "worth a second look", "quote": "the CLPM baseline"},
+            }]
+            submit.urllib.request.urlopen = self._fake_urlopen(200, {"comments": comments})
+
+            out = io.StringIO()
+            import contextlib
+            with contextlib.redirect_stdout(out):
+                submit.check_for_new_comments(root, "https://cls.example.edu", "tok", "sh1")
+            first_output = out.getvalue()
+            self.assertIn("Instructor feedback (1 new)", first_output)
+            self.assertIn("Prof. Kim", first_output)
+            self.assertIn("worth a second look", first_output)
+            self.assertIn("the CLPM baseline", first_output)
+
+            seen = submit.read_seen_comments(root)
+            self.assertEqual(seen.get("sh1"), ["c1"])
+
+            # Second check with the SAME comment already seen prints nothing new.
+            out2 = io.StringIO()
+            with contextlib.redirect_stdout(out2):
+                submit.check_for_new_comments(root, "https://cls.example.edu", "tok", "sh1")
+            self.assertNotIn("Instructor feedback", out2.getvalue())
+
+    def test_check_for_new_comments_scopes_seen_state_by_sharehash(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            make_project(root)
+            os.environ["CLAUDE_PLUGIN_DATA"] = str(root / "data")
+            c = {"id": "c1", "author": "A", "receivedAt": "t", "annotation": {"type": "general", "comment": "x"}}
+            submit.urllib.request.urlopen = self._fake_urlopen(200, {"comments": [c]})
+            out = io.StringIO()
+            import contextlib
+            with contextlib.redirect_stdout(out):
+                submit.check_for_new_comments(root, "https://cls.example.edu", "tok", "sh1")
+            self.assertIn("Instructor feedback", out.getvalue())
+
+            # A comment with the SAME id under a DIFFERENT shareHash (a later
+            # submission) is still new — seen-state must not bleed across keys.
+            out2 = io.StringIO()
+            with contextlib.redirect_stdout(out2):
+                submit.check_for_new_comments(root, "https://cls.example.edu", "tok", "sh2")
+            self.assertIn("Instructor feedback", out2.getvalue())
+
+
 class TestPreflightWarnings(unittest.TestCase):
     def test_malformed_trailer_warns(self):
         with tempfile.TemporaryDirectory() as d:
@@ -357,7 +468,7 @@ class TestResponseHandling(unittest.TestCase):
         import contextlib
         with contextlib.redirect_stdout(out):
             with self.assertRaises(SystemExit) as cm:
-                submit.submit_envelope("https://cls.example.edu", "tok", {"x": 1})
+                submit.submit_envelope(Path("."), "https://cls.example.edu", "tok", {"x": 1})
         self.assertEqual(cm.exception.code, 0)
         self.assertIn("Submitted", out.getvalue())
 
@@ -368,7 +479,7 @@ class TestResponseHandling(unittest.TestCase):
         import contextlib
         with contextlib.redirect_stdout(out):
             with self.assertRaises(SystemExit) as cm:
-                submit.submit_envelope("https://cls.example.edu", "tok", {"x": 1})
+                submit.submit_envelope(Path("."), "https://cls.example.edu", "tok", {"x": 1})
         self.assertEqual(cm.exception.code, 0)
         self.assertIn("already submitted", out.getvalue())
 
@@ -380,7 +491,7 @@ class TestResponseHandling(unittest.TestCase):
                 req.full_url, 401, "Unauthorized", {}, io.BytesIO(b""))
         submit.urllib.request.urlopen = raise_401
         with self.assertRaises(SystemExit) as cm:
-            submit.submit_envelope("https://cls.example.edu", "badtok", {"x": 1})
+            submit.submit_envelope(Path("."), "https://cls.example.edu", "badtok", {"x": 1})
         self.assertEqual(cm.exception.code, 1)
 
     def test_413_reports_limit(self):
@@ -392,7 +503,7 @@ class TestResponseHandling(unittest.TestCase):
                 req.full_url, 413, "Too Large", {}, io.BytesIO(body))
         submit.urllib.request.urlopen = raise_413
         with self.assertRaises(SystemExit):
-            submit.submit_envelope("https://cls.example.edu", "tok", {"x": 1})
+            submit.submit_envelope(Path("."), "https://cls.example.edu", "tok", {"x": 1})
 
     def test_network_error_dies(self):
         import urllib.error
@@ -401,7 +512,7 @@ class TestResponseHandling(unittest.TestCase):
             raise urllib.error.URLError("connection refused")
         submit.urllib.request.urlopen = raise_conn
         with self.assertRaises(SystemExit) as cm:
-            submit.submit_envelope("https://cls.example.edu", "tok", {"x": 1})
+            submit.submit_envelope(Path("."), "https://cls.example.edu", "tok", {"x": 1})
         self.assertEqual(cm.exception.code, 1)
 
 

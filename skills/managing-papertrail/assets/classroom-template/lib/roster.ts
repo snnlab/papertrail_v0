@@ -13,6 +13,7 @@ import { timingSafeEqualStr } from "./auth.js";
 
 const ROSTER_PREFIX = "roster/";
 const TOKEN_INDEX_PREFIX = "roster-token-index/";
+const LAST_VIEWED_PATH = "roster-meta/last-viewed.json";
 
 export const STUDENT_ID_RE = /^[a-zA-Z0-9._-]{1,100}$/;
 
@@ -127,6 +128,24 @@ export async function rotateToken(
   if (!existing) return null;
   const { token, entry } = await upsertStudent(blobToken, pepper, studentId, existing.displayName);
   return { token, entry };
+}
+
+// "New since I last opened the dashboard." There is only one instructor
+// login this round (the shared BOARD_PASSWORD), so a single pointer is
+// enough — no per-instructor state to key it by. GET /api/roster reads the
+// PREVIOUS value to compute each row's isNewSinceLastView (see api/roster.ts),
+// then overwrites it with `now` — the same "read-before-overwrite" shape as
+// board.py's own hosted-comment pull-clears-on-read behavior, just for
+// submissions instead of comments.
+export async function getLastViewed(blobToken: string): Promise<string | null> {
+  const doc = await readJsonBlob<{ timestamp: string }>(blobToken, LAST_VIEWED_PATH);
+  return doc?.timestamp ?? null;
+}
+
+export async function setLastViewed(blobToken: string, timestamp: string): Promise<void> {
+  await put(LAST_VIEWED_PATH, JSON.stringify({ timestamp }), {
+    access: "private", allowOverwrite: true, contentType: "application/json", token: blobToken,
+  });
 }
 
 // Resolves a plaintext bearer token to a studentId via the reverse index —

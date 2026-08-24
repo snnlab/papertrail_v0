@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import Roster from "./Roster";
 import type { RosterData } from "../lib/rosterTypes";
 
@@ -36,6 +36,7 @@ function data(): RosterData {
           ],
         },
         similarityFlags: [],
+        isNewSinceLastView: true,
       },
       {
         studentId: "s-brody",
@@ -79,6 +80,14 @@ describe("Roster table", () => {
     expect(screen.getByText("never submitted")).toBeTruthy();
     const row = screen.getByText("Cora").closest("tr")!;
     expect(row.getAttribute("title")).toBe("No submissions yet");
+  });
+
+  it("shows a \"new\" badge only for a row flagged isNewSinceLastView", () => {
+    render(<Roster data={data()} />);
+    const amaraRow = screen.getByText("Amara").closest("tr")!;
+    const brodyRow = screen.getByText("Brody").closest("tr")!;
+    expect(within(amaraRow).getByText("new")).toBeTruthy();
+    expect(within(brodyRow).queryByText("new")).toBeNull();
   });
 
   it("renders each row's integrity status with the shared vocabulary", () => {

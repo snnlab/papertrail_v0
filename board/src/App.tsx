@@ -306,11 +306,18 @@ export default function App({ data }: { data: BoardData }) {
 
   useEffect(() => {
     if (!hosted) return;
-    fetch("/api/comments")
+    // The shareHash query param is a no-op for a single-project web-template
+    // deploy (one project, one shareHash-space, ignored) and is REQUIRED for
+    // the classroom roster server (many students' comments share one
+    // deployment, scoped by shareHash — see classroom-template's
+    // api/comments.ts). data.shareHash already exists on every hosted
+    // payload; no new field needed.
+    const qs = data.shareHash ? `?shareHash=${encodeURIComponent(data.shareHash)}` : "";
+    fetch(`/api/comments${qs}`)
       .then((r) => (r.ok ? r.json() : { comments: [] }))
       .then((d) => setServerComments(d.comments ?? []))
       .catch(() => setServerComments([]));
-  }, [hosted]);
+  }, [hosted, data.shareHash]);
 
   const { live, stale } = hosted
     ? partitionComments(serverComments, data)

@@ -10,7 +10,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { SECURITY_HEADERS } from "../lib/gate.js";
 import { validateEnvelopeShape, validateEnvelopeSize } from "../lib/validate.js";
 import { resolveToken } from "../lib/roster.js";
-import { putSubmission, advanceLatestPointer, type StoredSubmission } from "../lib/submissions.js";
+import { putSubmission, advanceLatestPointer, indexShareHashOwner, type StoredSubmission } from "../lib/submissions.js";
 import { reverifySubmission } from "../lib/reverify.js";
 
 export interface RunResult { status: number; json: unknown }
@@ -103,6 +103,12 @@ export async function run(
       idempotencyKey: envelope.idempotencyKey,
       submittedAt: envelope.submittedAt,
     });
+    // Lets GET/POST /api/comments resolve this submission's shareHash back to
+    // a studentId (see lib/submissions.ts's indexShareHashOwner) — written
+    // only here, alongside the pointer advance, for the same reason: a
+    // replay must never re-derive state from a submission that isn't
+    // actually new.
+    await indexShareHashOwner(blobToken, envelope.idempotencyKey, studentId);
     return {
       status: 201,
       json: { status: "created", submissionId: envelope.idempotencyKey, reverify: result.stored.reverify },

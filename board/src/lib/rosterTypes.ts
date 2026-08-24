@@ -64,6 +64,11 @@ export interface RosterRow {
   lastSubmission: RosterSubmissionSummary | null;
   submissionCount: number;
   similarityFlags: SimilarityFlag[];
+  // True when lastSubmission postdates the instructor's previous roster
+  // visit (server-computed from a single last-viewed pointer — see
+  // classroom-template's lib/roster.ts). Optional so older cached payloads
+  // without this field still parse; absence renders as "not new".
+  isNewSinceLastView?: boolean;
 }
 
 // ---- GET /api/submissions/:studentId ----

@@ -110,6 +110,58 @@ describe("GET /api/roster", () => {
     expect(row.similarityFlags).toEqual([{ withStudentId: "bob", jaccard: 0.5, artifact: "decision-log" }]);
     expect(row.submissionCount).toBe(1);
   });
+
+  it("flags a row isNewSinceLastView when its submission postdates the instructor's last visit, and clears on the next visit", async () => {
+    // Anchored to the real wall clock (not the fictional NOW second-count
+    // used elsewhere) because setLastViewed/getLastViewed compare real
+    // `new Date().toISOString()` values, not the `now` epoch-seconds param.
+    const submittedAt = new Date(Date.now() - 3600_000).toISOString(); // 1 hour ago
+    list.mockImplementation(async (opts: { prefix: string }) => {
+      if (opts.prefix === "roster/") return { blobs: [{ pathname: "roster/alice.json" }], hasMore: false };
+      if (opts.prefix === "submissions/alice/") return { blobs: [{ pathname: "submissions/alice/key1.json" }], hasMore: false };
+      return { blobs: [], hasMore: false };
+    });
+    get.mockImplementation(async (pathname: string) => {
+      if (pathname === "roster/alice.json") {
+        return { statusCode: 200, stream: streamOf({ studentId: "alice", displayName: "Alice", tokenHash: "h", createdAt: "x" }) };
+      }
+      if (pathname === "roster-meta/last-viewed.json") return null; // never viewed yet
+      if (pathname === "submissions/alice/_latest.json") {
+        return { statusCode: 200, stream: streamOf({ idempotencyKey: "key1", submittedAt }) };
+      }
+      if (pathname === "submissions/alice/key1.json") {
+        return { statusCode: 200, stream: streamOf({ studentId: "alice", submittedAt, idempotencyKey: "key1", reverify: [], payload: { files: { executionPlans: [] } } }) };
+      }
+      return null;
+    });
+
+    const first = await run("GET", authedHeaders(), undefined, ENV, NOW);
+    const firstRow = (first.json as { students: Record<string, unknown>[] }).students[0];
+    expect(firstRow.isNewSinceLastView).toBe(true);
+
+    // The last-viewed pointer must have been advanced to "now" for next time.
+    const pointerWrite = put.mock.calls.find((c) => c[0] === "roster-meta/last-viewed.json");
+    expect(pointerWrite).toBeTruthy();
+    const writtenTimestamp = (JSON.parse(pointerWrite![1] as string) as { timestamp: string }).timestamp;
+
+    // A second visit, with the pointer now set to after the submission, sees it as no longer new.
+    get.mockImplementation(async (pathname: string) => {
+      if (pathname === "roster/alice.json") {
+        return { statusCode: 200, stream: streamOf({ studentId: "alice", displayName: "Alice", tokenHash: "h", createdAt: "x" }) };
+      }
+      if (pathname === "roster-meta/last-viewed.json") return { statusCode: 200, stream: streamOf({ timestamp: writtenTimestamp }) };
+      if (pathname === "submissions/alice/_latest.json") {
+        return { statusCode: 200, stream: streamOf({ idempotencyKey: "key1", submittedAt }) };
+      }
+      if (pathname === "submissions/alice/key1.json") {
+        return { statusCode: 200, stream: streamOf({ studentId: "alice", submittedAt, idempotencyKey: "key1", reverify: [], payload: { files: { executionPlans: [] } } }) };
+      }
+      return null;
+    });
+    const second = await run("GET", authedHeaders(), undefined, ENV, NOW + 10);
+    const secondRow = (second.json as { students: Record<string, unknown>[] }).students[0];
+    expect(secondRow.isNewSinceLastView).toBe(false);
+  });
 });
 
 describe("POST /api/roster", () => {

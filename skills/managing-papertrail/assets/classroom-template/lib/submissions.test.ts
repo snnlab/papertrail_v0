@@ -12,7 +12,7 @@ const { put, get, list } = vi.hoisted(() => ({
 }));
 vi.mock("@vercel/blob", () => ({ put, get, list }));
 
-import { putSubmission, advanceLatestPointer, getLatestPointer, listSubmissionsForStudent, type StoredSubmission } from "./submissions";
+import { putSubmission, advanceLatestPointer, getLatestPointer, listSubmissionsForStudent, indexShareHashOwner, resolveShareHashOwner, type StoredSubmission } from "./submissions";
 
 const TOKEN = "tok-blob";
 
@@ -99,6 +99,24 @@ describe("advanceLatestPointer / getLatestPointer", () => {
     );
     get.mockResolvedValue({ statusCode: 200, stream: streamOf({ idempotencyKey: "abc", submittedAt: "2026-08-10T10:00:00.000Z" }) });
     expect(await getLatestPointer(TOKEN, "alice")).toEqual({ idempotencyKey: "abc", submittedAt: "2026-08-10T10:00:00.000Z" });
+  });
+});
+
+describe("indexShareHashOwner / resolveShareHashOwner", () => {
+  it("writes an overwritable index entry and resolves it back", async () => {
+    await indexShareHashOwner(TOKEN, "cae78817221bfe49", "alice");
+    expect(put).toHaveBeenCalledWith(
+      "submission-index/cae78817221bfe49.json",
+      JSON.stringify({ studentId: "alice" }),
+      expect.objectContaining({ allowOverwrite: true }),
+    );
+    get.mockResolvedValue({ statusCode: 200, stream: streamOf({ studentId: "alice" }) });
+    expect(await resolveShareHashOwner(TOKEN, "cae78817221bfe49")).toBe("alice");
+  });
+
+  it("returns null for an unknown shareHash", async () => {
+    get.mockResolvedValue(null);
+    expect(await resolveShareHashOwner(TOKEN, "unknown")).toBeNull();
   });
 });
 

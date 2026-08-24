@@ -5,7 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { isAuthed, type HeaderBag } from "../lib/auth.js";
 import { SECURITY_HEADERS } from "../lib/gate.js";
-import { listRoster, upsertStudent, STUDENT_ID_RE, type RosterEntry } from "../lib/roster.js";
+import { listRoster, upsertStudent, getLastViewed, setLastViewed, STUDENT_ID_RE, type RosterEntry } from "../lib/roster.js";
 import { getLatestPointer, getSubmission, listSubmissionsForStudent } from "../lib/submissions.js";
 import { readSimilarityCache, type SimilarityResult } from "../lib/similarity.js";
 import { findFreshestManifest, isRecord } from "../lib/reverify.js";
@@ -16,6 +16,7 @@ async function buildRosterRow(
   blobToken: string,
   entry: RosterEntry,
   similarity: SimilarityResult | null,
+  lastViewed: string | null,
 ): Promise<Record<string, unknown>> {
   const pointer = await getLatestPointer(blobToken, entry.studentId);
   let lastSubmission: Record<string, unknown> | null = null;
@@ -61,12 +62,17 @@ async function buildRosterRow(
       artifact: f.artifact,
     }));
 
+  const isNewSinceLastView = !!(
+    lastSubmission && (!lastViewed || String(lastSubmission.submittedAt) > lastViewed)
+  );
+
   return {
     studentId: entry.studentId,
     displayName: entry.displayName,
     lastSubmission,
     submissionCount,
     similarityFlags,
+    isNewSinceLastView,
   };
 }
 
@@ -85,14 +91,23 @@ export async function run(
   if (method === "GET") {
     const roster = await listRoster(blobToken);
     const cache = await readSimilarityCache(blobToken);
-    const students = await Promise.all(roster.map((entry) => buildRosterRow(blobToken, entry, cache)));
+    // Read the PREVIOUS last-viewed pointer before this view overwrites it —
+    // every row's isNewSinceLastView is computed against the value as of the
+    // instructor's prior visit, not this one, or every row would read as
+    // "not new" the instant they're first seen.
+    const lastViewed = await getLastViewed(blobToken);
+    const students = await Promise.all(
+      roster.map((entry) => buildRosterRow(blobToken, entry, cache, lastViewed)),
+    );
     students.sort((a, b) => String(a.displayName).localeCompare(String(b.displayName)));
+    const generatedAt = new Date().toISOString();
+    await setLastViewed(blobToken, generatedAt);
     return {
       status: 200,
       json: {
         schemaVersion: 1,
         course: { id: env.COURSE_ID ?? "course" },
-        generatedAt: new Date().toISOString(),
+        generatedAt,
         students,
       },
     };

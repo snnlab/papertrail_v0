@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0] - 2026-08-25
+
+Closes a gap in the roster server (v0.2.0): drilling into a student's board from the roster dashboard had no way to actually leave a comment, and nothing told a student one had been left. Both are now real, in keeping with the existing "no push notifications anywhere in this tool" design: the instructor's comment is stored, and a student finds out only by running `/papertrail:submit`, which now also checks their own submissions for anything new.
+
+### Added
+- **Instructor comments on a submitted board.** Drilling into a student's board from the roster reuses the exact same hosted-comment flow a `--publish-web` collaborator link already has (select text, leave a comment) — `board/src/views/Roster.tsx` marks the drilled-in payload `mode: "hosted"` so `App.tsx`'s existing comment machinery fires unmodified. The classroom server gained `GET/POST /api/comments` (`skills/managing-papertrail/assets/classroom-template/{lib,api}/comments.ts`), storing comments scoped by `shareHash` (a submission's content hash), resolved to a student via a new `submission-index/` reverse lookup written at submission-accept time. Reads are authorized either by the instructor's session (any student) or a student's own bearer token (their own submissions only, never another student's).
+- **A student learns about a comment by running `/papertrail:submit`.** No email, no webhook — consistent with this tool never sending anything on its own. Every submit now also fetches the student's own comments (`skills/managing-papertrail/scripts/submit.py`'s `check_for_new_comments`), diffs against a locally remembered "seen" set keyed by shareHash, and prints anything new under an "Instructor feedback" heading.
+- **A "new" badge on the roster table** for any row submitted since the instructor's last visit to the dashboard (`isNewSinceLastView`, computed server-side from a single last-viewed pointer in `lib/roster.ts` — there being only one instructor login, no per-person state is needed).
+
+### Changed
+- `board/src/App.tsx`'s hosted-comment fetch now includes `?shareHash=` in its `GET /api/comments` call — a no-op for the existing single-project `web-template` deploy (one project, one shareHash-space, the extra query param is ignored), required for the classroom server to know which student's comments to return.
+- `docs/hosting-the-roster.md` and the README's roster section now describe this accurately — they previously undersold what the drill-down view could do (nothing) and oversold it (comment-capable) at different points; both are now correct.
+
 ## [0.2.0] - 2026-08-25
 
 Adds an instructor-hosted classroom roster server: students submit their project state to one central, multi-tenant server (separate from the existing single-project `--publish-web` sharing) so the instructor reviews everyone from one dashboard instead of opening each student's board individually.

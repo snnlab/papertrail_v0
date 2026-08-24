@@ -96,6 +96,29 @@ describe("Roster drill-in", () => {
     expect(screen.getByRole("button", { name: "Tracker" })).toBeTruthy();
   });
 
+  it("renders the drilled-in board in hosted mode so the instructor can comment, even though the wire payload says mode: submission", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      if (String(input) === "/api/submissions/s-amara") {
+        return { ok: true, status: 200, json: async () => submissions() };
+      }
+      // App's own hosted-mode comment fetch, fired only when canAnnotate is
+      // true for mode "hosted" — proves the override actually took effect,
+      // not just that the roster's own submissions fetch happened.
+      return { ok: true, status: 200, json: async () => ({ comments: [] }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<Roster data={roster()} />);
+    fireEvent.click(screen.getByText("Amara"));
+    await waitFor(() => {
+      expect(screen.getByText("Amara's Paper")).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some((c) => String(c[0]).startsWith("/api/comments"))).toBe(true);
+    });
+    // canAnnotate-gated "Feedback (N)" button only renders for live/remote/hosted.
+    expect(screen.getByRole("button", { name: /Feedback/ })).toBeTruthy();
+  });
+
   it("returns to the roster table via the back affordance", async () => {
     vi.stubGlobal(
       "fetch",

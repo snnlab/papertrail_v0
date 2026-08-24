@@ -81,6 +81,12 @@ There is no dedicated reconnect flow yet for this template (unlike the single-pr
 
 They never get a login page or a password for this server — their only credential is the personal token, used solely by the submission command, never a browser session.
 
+## Leaving comments, and how a student finds out about them
+
+Clicking into a student's row on the roster dashboard opens their board exactly as they'd see it themselves, with commenting turned on — select text, leave a comment, the same flow as a `--publish-web` collaborator link. A row marked **new** was submitted since your last visit to the dashboard, so you don't have to remember what you've already looked at.
+
+There is no push notification anywhere in this tool — no email, no webhook, nothing that reaches a student on its own. A comment you leave sits on the server until the student's own `/papertrail:submit` checks for it, the next time they run it, using their own personal token (never yours, and never another student's). If you need a student to see something before they'd naturally submit again, tell them directly — the same as you would for any other feedback.
+
 ## Data and privacy
 
 Read this section before your first deploy — it involves meaningfully more than the single-collaborator board.

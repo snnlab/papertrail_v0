@@ -16,6 +16,7 @@ import type { ReverifyCheck } from "./reverify.js";
 import type { GitExcerpt } from "./validate.js";
 
 const SUBMISSIONS_PREFIX = "submissions/";
+const SHAREHASH_INDEX_PREFIX = "submission-index/";
 
 export interface StoredSubmission {
   studentId: string;
@@ -39,6 +40,9 @@ function submissionPath(studentId: string, key: string): string {
 }
 function latestPointerPath(studentId: string): string {
   return `${SUBMISSIONS_PREFIX}${studentId}/_latest.json`;
+}
+function shareHashIndexPath(key: string): string {
+  return `${SHAREHASH_INDEX_PREFIX}${key}.json`;
 }
 
 async function readJsonBlob<T>(blobToken: string, pathname: string): Promise<T | null> {
@@ -125,6 +129,32 @@ export async function advanceLatestPointer(
 
 export async function getLatestPointer(blobToken: string, studentId: string): Promise<LatestPointer | null> {
   return readJsonBlob<LatestPointer>(blobToken, latestPointerPath(studentId));
+}
+
+// A submission's idempotencyKey doubles as its payload's shareHash (both are
+// submit.py's share_hash over the same payload — see submit.py's
+// build_envelope). This index lets GET/POST /api/comments resolve "which
+// student does this shareHash belong to" in one Blob get() — the same
+// one-lookup shape as lib/roster.ts's token->studentId reverse index —
+// instead of scanning every student's submissions. Written only on a
+// CREATED submission (never on replay/conflict), mirroring
+// advanceLatestPointer's own call-site guard in api/submissions.ts.
+export async function indexShareHashOwner(
+  blobToken: string,
+  shareHash: string,
+  studentId: string,
+): Promise<void> {
+  await put(shareHashIndexPath(shareHash), JSON.stringify({ studentId }), {
+    access: "private", allowOverwrite: true, contentType: "application/json", token: blobToken,
+  });
+}
+
+export async function resolveShareHashOwner(
+  blobToken: string,
+  shareHash: string,
+): Promise<string | null> {
+  const indexed = await readJsonBlob<{ studentId: string }>(blobToken, shareHashIndexPath(shareHash));
+  return indexed?.studentId ?? null;
 }
 
 export async function getSubmission(
