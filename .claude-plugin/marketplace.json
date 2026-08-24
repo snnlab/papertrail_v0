@@ -1,0 +1,18 @@
+{
+  "name": "papertrail",
+  "description": "A plan-based bridge between graduate students and their instructor for quantitative-methods coursework.",
+  "owner": {
+    "name": "PaperTrail contributors",
+    "url": "https://github.com/DS3693/papertrail"
+  },
+  "plugins": [
+    {
+      "name": "papertrail",
+      "source": "./",
+      "description": "A versioned analysis plan per component, a sign-off gate before the AI executes analysis, an append-only decision log, checksum-verified results bundles, and a browser board for instructor review and annotation.",
+      "author": {
+        "name": "PaperTrail contributors"
+      }
+    }
+  ]
+}
