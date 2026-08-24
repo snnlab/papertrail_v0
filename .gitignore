@@ -12,3 +12,6 @@ plans-admin/
 __pycache__/
 .pytest_cache/
 .playwright-mcp/
+README.html
+README_files/
+.quarto/

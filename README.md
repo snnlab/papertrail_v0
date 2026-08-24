@@ -13,89 +13,156 @@ PaperTrail은 여기에 AI를 끼워 넣어 **학생-AI-교수(3자 체제)**로
 - **교수자 역할의 승격.** 교수자는 뻔한 코드 오류나 표 형식을 교정하는 데 시간을 낭비하지 않고, 이론적 기여도 같은 차원 높은 지적 멘토링에만 집중할 수 있습니다.
 - **저자성(authorship)의 강제.** AI가 임의로 분석을 시작하지 못합니다. 학생이 실행 계획을 사전에 확인하고 서명(sign)해야만 코드가 실행되므로, 결과에 대한 책임은 항상 학생에게 남습니다 — '정답을 기다리는 수동적 실행자'가 아니라 스스로 방법론을 변호하는 '연구 설계자'로 성장하게 됩니다.
 
-이 원칙들은 도구 안의 구체적인 메커니즘으로 구현되어 있고, 각각은 학술적 진정성(academic integrity)을 지키는 역할을 맡습니다:
+## 한눈에 보기 — 무엇을 만들었는가
+
+PaperTrail은 [Claude Code](https://claude.com/claude-code) 플러그인입니다. **학생이 로컬에서 쓰는 워크플로우**(계획 작성 → rubric 채점 → 서명 → 실행 → 결과물 검증 → 리포트)와, **교수자가 서버를 열어 여러 학생을 한 번에 검토하는 로스터 대시보드**(v0.2.0, 신규) 두 축으로 구성됩니다.
+
+| 축 | 무엇을 하는가 | 핵심 산출물 |
+|---|---|---|
+| **학생 워크플로우** | 논문의 각 분석 단계를 계획 → 채점 → 서명 → 실행하는 루프. 서명 없이는 AI가 아무 파일도 못 씀. | 서명된 분석 계획, 타임스탬프 의사결정 로그, checksum 검증된 결과물 번들 |
+| **교수자 로스터 서버** (🆕 v0.2.0) | 학생이 `/papertrail:submit`으로 자기 프로젝트 상태를 교수자 서버에 제출 → 교수자는 대시보드 하나에서 전체 학생을 검토 | 서버가 직접 재계산한 무결성/점수, 조작 탐지, 학생 간 유사도(표절 의심) 탐지 |
+| **학술 진정성(academic integrity) 설계** | 5가지 이상의 부정행위 방지 장치가 워크플로우 곳곳에 내장 | 낮은 근거 점수 서명 시 자동 경고 기록, AI 사용 내역 공개, 소급 계획 작성 제한, AI 대필 금지 규칙 |
+
+이 모든 기록이 브라우저 보드 위에 하나로 모입니다. 교수자는 최종 결과물만이 아니라, 학생이 연구를 진행한 논리적 궤적 전체를 투명하게 들여다보고 코멘트를 남길 수 있습니다 (보드는 **코멘트 전용**이며, 계획을 승인하거나 서명하는 권한은 항상 학생에게 있습니다 — 로스터 서버를 포함해 어디에도 교수자용 "승인" 버튼은 없습니다).
+
+## 핵심 메커니즘
+
+각 메커니즘은 academic-integrity 목적을 명확히 갖고 설계되었습니다:
 
 | 메커니즘 | academic-integrity 목적 |
 |---|---|
 | **결정 로그 (decision log)** | 방법론적 선택의 근거(예: CLPM과 RI-CLPM 분석결과를 비교한 뒤 특정 모형을 채택한 이론적 이유)가 휘발성 대화로 사라지지 않고 타임스탬프와 함께 불변의 로그로 영구 기록됩니다. |
-| **사인오프 게이트 (sign-off gate)** | 학생이 실행 계획에 먼저 서명해야만 AI가 분석을 실행할 수 있습니다 — 저자성을 기계적으로 강제합니다. |
-| **이탈 플래깅 (deviation flagging)** | 계획과 다르게 실행된 부분(결측치 임의 처리, 모형 임의 단순화 등)은 조용히 넘어가지 않고 즉시 위반(breach)으로 깃발이 꽂히고 기록됩니다. |
-| **결과물 번들 (results bundle)** | 교수에게 보고할 도표와 계수표가 정확히 어떤 스크립트에서 나왔는지 체크섬으로 추적 가능한 번들로 봉인되어, 보고 수준의 신뢰도를 보장합니다. |
+| **사인오프 게이트 (sign-off gate)** | 학생이 실행 계획에 먼저 서명해야만 AI가 분석을 실행할 수 있습니다 — 저자성을 기계적으로 강제합니다. 서명은 로컬 브라우저에서 여는 세션에서 학생이 직접 클릭해야만 성립합니다. |
+| **이탈 플래깅 (deviation flagging)** | 계획과 다르게 실행된 부분(결측치 임의 처리, 모형 임의 단순화 등)은 조용히 넘어가지 않고 즉시 위반으로 깃발이 꽂히고 기록됩니다. |
+| **결과물 번들 (results bundle)** | 교수에게 보고할 도표와 계수표가 정확히 어떤 스크립트에서 나왔는지 checksum으로 추적 가능한 번들로 봉인되어, 보고 수준의 신뢰도를 보장합니다. |
+| **rubric 채점 (5채널)** | 계획의 목표·근거·단계·검증·경계를 0~3점씩 채점 — "AI가 먼저 논리적 비약을 공격"을 형식적 장치로 만든 것. |
 
-이 모든 기록이 브라우저 보드 위에 하나로 모입니다. 교수자는 최종 결과물만이 아니라, 학생이 연구를 진행한 논리적 궤적 전체를 투명하게 들여다보고 코멘트를 남길 수 있습니다 (보드는 코멘트 전용이며, 계획을 승인하거나 서명하는 권한은 항상 학생에게 있습니다).
+## 전체 커맨드 목록
 
----
+### 학생용
 
-## What you get
+| 커맨드 | 하는 일 |
+|---|---|
+| `/papertrail:init` | 프로젝트에 워크플로우 설정 (paper plan, decision log, CLAUDE.md 규약) |
+| `/papertrail:plan` | 컴포넌트(분석 단계)를 정하고 실행 계획을 함께 작성 |
+| `/papertrail:review` | 실행 계획을 5채널 rubric으로 채점 — 프로필, 가장 약한 지점, 고칠 항목 제시 |
+| `/papertrail:sign` | 대기 중인 계획에 서명 — 슬림 세션 + 티켓 + 최종화 트랜잭션 |
+| `/papertrail:execute` | 대기 중인 초안을 게이트에서 서명한 뒤, 실행 → 결과물 검증 → 리포트까지 진행 |
+| `/papertrail:sync` | 실행 후 체크포인트 — 트래커 갱신, 누락된 의사결정 포착, 계획이 이탈했으면 새 버전 기록 |
+| `/papertrail:results` | 결과물 번들을 캡처하거나 정합성 재확인 (`--adopt`로 기존 산출물도 가능) |
+| `/papertrail:report` | 결과물 번들로부터 공유용 Markdown 리포트 생성 (pandoc으로 PDF/DOCX도) |
+| `/papertrail:board` | 브라우저 대시보드 열기 — 트래커, 버전 diff가 있는 계획, 의사결정 타임라인, 생성된 리포트, rubric 점수판. 실시간으로 주석을 달거나 공유용 스냅샷으로 내보낼 수 있음 |
+| `/papertrail:submit` | 🆕 현재 프로젝트 상태를 교수자의 로스터 서버에 제출 |
+| `/papertrail:models` | 단계별 모델 프로필을 보거나 수정하고 `pt-*` 리뷰 에이전트를 재생성 |
+| `/papertrail:adopt` | 이미 끝낸 작업을 소급 컴포넌트/계획으로 전환, 한 번의 보드 배치로 검토 |
+| `/papertrail:renew` | master plan을 아카이브하고 새 방향으로 시작 (컴포넌트 번호·재사용 가능한 작업은 유지) |
 
-Coding agents can produce plausible analyses faster than you can track why each one exists — five versions of a figure, three model specifications, and no record of which one made it into the draft, or why. PaperTrail keeps you in charge of that. It's a [Claude Code](https://claude.com/claude-code) plugin, built for a graduate quantitative-methods course: the agent works from a short plan you sign at the execution gate *before* it runs — what the work will do, why, and how you'll know it worked — then records every revision, decision, and result against that plan. You stay the author of the choices and the interpretation; the agent does the work and keeps the books.
+### 교수자용
 
-It's the commit-before-you-look discipline you know from preregistration, made into a living plan rather than a frozen registry entry. It won't make an analysis correct — it makes the plan you approved, and every deviation from it, something you (and your instructor) can actually see.
+| 커맨드 | 하는 일 |
+|---|---|
+| `/papertrail:host` | 🆕 여러 학생이 제출할 수 있는 로스터 서버를 개설/운영 — 프로젝트별 보드와는 별개, 교수자 전용 |
+| `/papertrail:board --publish-web` | (학생이 실행) 학생 한 명의 보드를 비밀번호로 보호된 개인 링크로 배포 — 로스터 서버 이전부터 있던, 학생↔교수자 1:1 공유 방식 |
 
-Five artifacts, each one an answer to *"what did the AI actually do, and can I stand behind it?"*
+교수자는 명령어를 직접 칠 필요가 없습니다 — 학생이 `--publish-web`으로 링크를 보내거나, `/papertrail:submit`으로 로스터 서버에 제출하면, 교수자는 브라우저만 열면 됩니다.
 
-- **A plan you sign before the work.** For each piece of the paper — a data-cleaning pass, one analysis, a robustness check — you and the agent co-author a short execution plan: its goal, the scope decisions and why you made them, the steps, and how you'll judge success. The draft stays pending until `/execute` opens a slim sign session, or you run `/sign` sooner. Nothing is signed until you approve it, and signing is enforced, not suggested (see [the sign-off gate](docs/reference.md#the-sign-off-gate)).
-- **A decision log written as decisions happen.** Every choice you and the agent make lands in an append-only, timestamped log — not reconstructed afterward from memory, when the reasons have already blurred.
-- **Plan versions that are immutable.** When execution teaches you something and the plan changes, `/sync` records a new amendment version that says what changed and why. The old version is never edited. Re-execution signs a fresh commitment to that amendment. A recorded revision is legitimate; only a silent deviation is a breach.
-- **Results you can verify.** Each analysis is captured as an immutable results bundle: the figures and tables (checksum-verified against the scripts that made them), the exact code, the key numbers, an automatic plan-vs-execution audit, and a mechanical score for how well the work held to its plan. Re-running an analysis can never quietly change what you already verified — a redo is the next bundle.
-- **A board that shows all of it.** A browser dashboard renders the whole project — the tracker, every plan and its diffs, the results, the decisions, the reviews — so you and your instructor can actually read what happened. Nobody has to trust a chat log they'll never see.
+## 작동 방식
 
-## How it works in practice
+**1. 프로젝트를 opt-in** — `/papertrail:init`. 논문 자체(가제, 무엇에 관한 것인지)부터 시작해 연구 질문, 데이터, 수업/마감 맥락을 짧게 인터뷰합니다. Master plan에 연구 질문과 그것을 서비스하는 컴포넌트(분석 단계)를 심습니다. 나머지는 전부 opt-in — init을 안 한 프로젝트에는 플러그인이 아무 영향도 주지 않습니다.
 
-The plugin adds a handful of commands to Claude Code. A normal paper moves through a loop, and the agent carries the bookkeeping at every step.
+**2. 계획 스코핑** — `/papertrail:plan`. 학생과 AI가 다음 컴포넌트를 함께 스코핑하고 채점된 초안을 준비합니다. 초안은 대기 상태로 남고 트래커는 `planned`로 표시됩니다. "Decisions and reasons" 점수가 2/3 미만이면 AI가 서명 전에 보강을 권고하고, 그래도 서명하면 그 override가 decision log에 명시적으로 기록됩니다 — 조용히 묻히지 않습니다.
 
-**1. Opt a project in** — `/papertrail:init`. A short interview opens with the paper itself (working title, what it's about), then the research questions, the data, and the course/deadline context. It seeds the master plan: the research questions, and the components (analysis steps) that serve them. Everything else is opt-in; the plugin does nothing in projects you haven't initialized.
+**3. 서명하고 루프 실행** — `/papertrail:execute`. 슬림 서명 세션이 커밋될 그대로의 계획을 보여줍니다. 승인하거나 변경을 요청합니다. 이후 지금 실행할지, 어떤 모델을 쓸지, 리포트를 만들지 하나의 프롬프트로 묻습니다. Agent가 서명된 계획을 커밋하고, 실행하고, 번들을 캡처·검증하고, 요청 시 리포트를 만들고, 트래커와 로그를 갱신하고, 커밋 하나를 제안하고, 보드를 열고, 다음 컴포넌트를 제안합니다.
 
-**2. Scope a plan** — `/papertrail:plan`. You and the agent scope the next component and prepare a scored draft. The board is available for reading, annotations, extra reviews, and a diff against the prior version. The draft stays pending, and the tracker marks the component `planned`. If the draft's "Decisions and reasons" score comes back below 2/3, the AI recommends revising it before you sign — and if you sign anyway, that override is logged to the decision log explicitly, not absorbed silently.
+**4. 루프 밖 작업 복구** — `/papertrail:sync`. `/execute` 밖에서 한 작업, 중단된 세션, 호스팅된 코멘트, 기록되지 않은 의사결정을 처리하는 수동 체크포인트입니다.
 
-**3. Sign and execute the loop** — `/papertrail:execute`. A slim sign session shows the pending plan exactly as it will be committed. You approve it or request changes. Then one prompt asks whether to run now, which model to use, and whether to make a report. The agent commits the signed plan, executes it, captures and validates the bundle, reports when requested, updates the tracker and log, suggests one commit, opens the board, and proposes the next component. The plan is the spine it works against, not a cage; interpretive choices still come back to you before the agent acts. Run `/papertrail:sign` when you want to sign pending plans without starting execution.
+**5. 필요할 때 결과물을 수동 캡처** — `/papertrail:results`. 버전이 매겨진 불변 번들을 봉인합니다: agent가 작성한 리포트, checksum 검증된 도표·표 스냅샷, 코드, 핵심 수치, 그리고 서명된 계획(혹은 기록된 amendment) 대 실제 실행을 비교하는 자동 검증.
 
-**4. Recover work outside the loop** — `/papertrail:sync`. This manual checkpoint handles work done outside `/execute`, crashed sessions, hosted comments, and decisions that did not get logged. It updates the tracker and records an amendment automatically when confirmed execution deviated from the plan. The amendment says what changed and why; the old version is never edited. Re-execution must sign a new commitment first. Deviation is not failure; unrecorded deviation is.
+**6. 리포트 작성** — `/papertrail:report`. 결과물 번들로부터 독립된 리포트를 조립합니다 — 배경, 데이터와 방법, 근거가 삽입된 발견, 검증 요약, 출처 부록, 그리고 각 단계에서 이미 캡처된 모델 사용 데이터로 만든 **AI Assistance Disclosure** 표.
 
-**5. Capture results manually when needed** — `/papertrail:results`. The execution loop normally does this for you. The direct command seals a versioned, immutable bundle for out-of-loop work or a recapture: an agent-drafted report, snapshot copies of the figures and tables (checksum-verified against the scripts that made them), the code, the key numbers as tiles, and an automatic validation — an independent check comparing the governing signed plan or recorded amendment against what actually ran.
+**7. 검토, 재개, 공유** — `/papertrail:board`. 대시보드를 엽니다. 계획과 리비전 히스토리를 읽거나, 초안에 주석을 달거나, 결과물 번들을 검토합니다. 교수자와 전체를 공유할 수 있는데, 교수자는 브라우저만 있으면 됩니다 — 코멘트는 가능하지만, 보드에는 학생 본인 외에 누구에게도 계획 승인 액션이 없습니다.
 
-**6. Write the report** — `/papertrail:report`. Assembles a standalone report from a results bundle — background, data and methods, findings with embedded figures/tables, a validation summary, a provenance appendix, and an **AI Assistance Disclosure** table built from the model-usage data already captured at each stage (plan, execute, review, validation), pointing back to the decision log and the bundle as the verifiable record.
+**8. 🆕 로스터 서버에 제출** — `/papertrail:submit`. 무엇이 포함되는지(컴포넌트/버전/결과물 번들 개수, git 커밋 범위, 전체 크기) 미리 보여주고, 학생의 명시적 확인 없이는 절대 전송하지 않습니다. 같은 내용을 다시 제출하면 아무 일도 일어나지 않습니다 (idempotent).
 
-**7. Review, reopen, share** — `/papertrail:board`. Open the dashboard. Read a plan and its revision history, annotate a draft, or review a results bundle: validation compares the governing plan with what executed, step by step, and defines the bundle's standing state. Reopen any finalized bundle with comments to drive a fix and a new capture. Share the whole thing with your instructor, who only needs a browser — they can comment, but the board has no plan-approval action for anyone but you. Plan approval always stays in your own slim sign session.
+**9. 🆕 교수자가 로스터 서버 운영** — `/papertrail:host`. 서버를 배포하고, 학생을 등록해 개인 토큰을 발급하고(공유 비밀번호 아님), 대시보드를 엽니다.
 
-The board runs on `python3` alone — nothing to install — as a small local server, or as a single self-contained HTML file you can email. It does not need Claude to open: every board open leaves a `./pt-board` script in the project, so a terminal command gets you the dashboard with no model in the loop, which matters on the day your session is rate-limited. Sharing to a private, password-protected link for a browser-only instructor is one more step (it uses Vercel and needs Node.js once, to set up). Full details are in the [reference](docs/reference.md#the-board).
+보드는 `python3`만으로 로컬 서버로 돌거나, 이메일로 보낼 수 있는 완전히 독립된 HTML 파일 하나로도 열립니다. Claude 없이도 열 수 있습니다 — 보드를 열 때마다 프로젝트에 `./pt-board` 스크립트가 남아, 터미널 명령 하나로 모델 없이 대시보드를 볼 수 있습니다.
 
-## Who it's for
+## 🆕 교수자용 로스터 서버 (v0.2.0)
 
-PaperTrail is for a specific kind of work, not everyone who touches an AI.
+학생 한 명의 보드를 공유하는 것(`--publish-web`, 링크 하나·비밀번호 하나)과 별개로, **교수자가 코스 전체를 위한 서버 하나를 열어 모든 학생의 제출물을 한 대시보드에서 검토**할 수 있습니다. 기존 인프라(Vercel 호스팅, Blob 저장소)를 확장한 새 배포 템플릿(`skills/managing-papertrail/assets/classroom-template/`)으로 구현되어 있습니다.
 
-It pays off when you are **already using a coding agent for real analysis** — data cleaning, modeling, robustness checks — on a **quantitative-methods final paper you'll have to defend**: to your instructor now, and to yourself later when you can't remember why you dropped those 40 cases. The plan-and-sign step costs you something up front; its value grows with every revision, every session, and every point where your instructor needs to see why, not just what.
+**인증 — 학생별 개별 토큰.** 기존 개인 공유는 "링크 하나 + 비밀번호 하나"였지만, 로스터 서버는 학생마다 별도의 고유 토큰을 발급합니다 (`/papertrail:host --add-student`). 토큰은 발급 시 한 번만 평문으로 보이고, 서버에는 해시만 저장됩니다. 다른 학생의 제출을 덮어쓰거나 다른 이름으로 위장할 수 없습니다.
 
-It is **not for one-off, throwaway exploration** — a quick plot to answer a question you'll forget by Friday doesn't need a durable record, and the workflow would just be friction. And an instructor who only reads the board is a beneficiary, not a user: they never run a command, and they can never sign or approve a plan — that stays the student's job, by design.
+**제출물은 자기 신고가 아니라 서버가 직접 재검증합니다.** 학생이 제출하면 서버는:
+- 결과물 번들의 checksum과 F·A·I 점수를 **제출된 원본 바이트로부터 직접 재계산**하고, 학생 쪽에서 봉인해 온 값과 대조합니다. 일치하지 않으면 — 즉 제출 후 manifest를 손으로 고쳤다면 — `mismatch`로 표시됩니다 (차단은 아니고, 눈에 띄게 플래그).
+- 서명된 계획의 트레일러 문법(`Signed off: ...`)이 올바른지 다시 검사합니다.
+- 제출에 포함된 git 커밋 이력(파일 경로·해시·시각·저자명·메시지 한 줄만, 코드 diff는 없음)과 서명 날짜를 대조해, 타이밍이 수상하면 서술형으로 알립니다.
+- 낮은 Decisions 점수로 서명했을 때 필요한 decision-log override 항목이 실제로 있는지 확인합니다.
 
-If you're **curious about agents but wary** of turning one loose on your analysis, this is a way in. The point of the plan is that the agent's autonomy has a boundary you set and can see.
+**학생 간 유사도(표절/공모 의심) 탐지.** 교수자가 대시보드에서 수동으로 실행하면, 모든 학생 쌍의 decision-log 텍스트를 k-셰이글링 + Jaccard 유사도로 비교해 "이 두 제출물의 문구가 비정상적으로 유사합니다 — 확인이 필요합니다" 형태의 서술형 신호를 보여줍니다. 자동 처벌이나 차단은 없습니다.
 
-## Principles
+**Trust-tier 범례.** 대시보드 상단에 항상 보이는 3단계 범례로, 초록 체크 하나만 보고 과신하지 않도록 설계했습니다:
+1. **기계적으로 재검증됨** (checksum, F·A·I 점수, 트레일러 문법) — 서버가 원본 데이터로 직접 다시 계산한 것.
+2. **서술적 단서** (git 타이밍, 유사도) — 기계적으로 계산되지만 판결이 아니라 확인해볼 가치가 있다는 신호.
+3. **자기 신고** (서명자 이름, rubric 점수) — 제출물만으로는 서버가 독립적으로 검증할 수 없는 항목.
 
-- Plans are written before the work and govern it. A plan is a contract with a built-in amendment process, not a preregistration: a recorded revision is legitimate and expected; only a silent deviation is a breach.
-- Plan versions are immutable. Revisions are new files that say what changed and why.
-- The decision log is written as decisions happen, never backfilled.
-- The student decides and signs. The AI asks, drafts, critiques, and keeps the books — but it never writes the paper's sociological interpretation on the student's behalf (see CLAUDE.md rule 11 in [claude-md-section.md](skills/managing-papertrail/templates/claude-md-section.md)).
+**교수자는 로스터에서도 승인/서명 권한이 없습니다.** 읽고 코멘트를 남길 수 있을 뿐이며, 이 불변 조건은 `AGENTS.md`에 명시적으로 문서화되어 향후 변경 시 반드시 검토하도록 되어 있습니다.
 
-The quality rubric bundled with the plugin (`docs/plan-rubric.md`, and the runtime copy at `skills/managing-papertrail/references/plan-rubric.md`) is adapted from the [Planboard](https://github.com/letitbk/planboard) project's plan-quality rubric — PaperTrail itself is a fork of Planboard, retargeted from a solo-researcher tool to this student–AI–instructor workflow.
+## 학술 진정성(academic integrity) 설계 요약
 
-## Install
+핵심 메커니즘 표에 있는 서명 게이트·결정 로그·결과물 번들·로스터 서버 재검증 외에, 워크플로우 곳곳에 다음 장치가 내장되어 있습니다:
 
-In Claude Code:
+- **낮은 Decisions 점수 서명 가드** (`plan.md`, `sign.md`) — 근거 채점이 2/3 미만인 채로 서명하면 그 사실이 decision log에 명시적으로 남습니다.
+- **소급 계획 작성(retrospective adoption) 제한 경고** (`adopt.md`) — 도구 밖에서 분석을 끝내고 나중에 그럴듯한 계획을 꾸며 넣는 우회로를 경고하고, rubric의 `unsupported-sources` 플래그를 안전장치로 명시합니다.
+- **AI 대필 금지 규칙** (CLAUDE.md rule 11) — AI는 초안 방향 제시나 반박은 하지만, 논문의 사회학적 해석·논증 문장은 항상 학생이 직접 써야 하며, AI가 초안을 쓴 경우 즉시 decision log에 플래그됩니다.
+- **AI Assistance Disclosure** (`report.md`) — 매 리포트마다 어느 단계에서 어떤 모델을 썼는지 표로 공개하고, decision log·결과물 번들을 검증 가능한 근거로 가리킵니다.
+- **교수자 코멘트 전용 원칙** (`board.md`, `host.md`) — 교수자는 읽고 코멘트만 남길 수 있으며, 계획 서명·승인 권한은 어디에도 없습니다. 이는 프로젝트 전체의 하드 불변 조건입니다.
+
+이 도구가 막지 못하는 것도 정직하게 문서화되어 있습니다: 서명은 `git user.name`과 브라우저 클릭에 의존하므로 신원 위조를 암호학적으로 막을 수는 없고, 정량 분석 파이프라인의 무결성은 검증하지만 문헌 리뷰·이론적 논의 문장 자체의 표절은 범위 밖입니다. 이 한계는 숨기지 않고 trust-tier로 명시합니다.
+
+## 누구를 위한 도구인가
+
+PaperTrail은 특정한 작업에 적합하지, AI를 만지는 모든 사람을 위한 것은 아닙니다.
+
+**이미 코딩 에이전트로 실제 분석**(데이터 정제, 모델링, 강건성 검토)**을 하고 있고**, 나중에 방어해야 할 **양적방법론 기말 페이퍼**를 쓰는 경우에 가치가 커집니다 — 지금은 교수자에게, 나중에는 왜 그 40개 사례를 제외했는지 기억나지 않을 스스로에게. 계획-서명 단계는 처음엔 비용이 들지만, 리비전이 늘어날수록, 세션이 늘어날수록, 교수자가 결과가 아니라 이유를 봐야 할 때마다 가치가 커집니다.
+
+**일회성 탐색 작업에는 맞지 않습니다** — 금요일이면 잊어버릴 질문에 답하는 간단한 그래프 하나는 durable record가 필요 없고, 워크플로우는 그저 마찰이 됩니다.
+
+## 원칙
+
+- 계획은 작업 전에 쓰이고 그것을 통제합니다. 계획은 사전등록이 아니라 개정 절차가 내장된 계약입니다: 기록된 리비전은 정당하고 예상된 것이며, 조용한 이탈만이 위반입니다.
+- 계획 버전은 불변입니다. 리비전은 무엇이 왜 바뀌었는지 말하는 새 파일입니다.
+- 의사결정 로그는 일이 일어나는 대로 쓰이고, 나중에 채워 넣지 않습니다.
+- 학생이 결정하고 서명합니다. AI는 묻고, 초안을 쓰고, 비판하고, 기록을 관리하지만 — 논문의 사회학적 해석을 학생 대신 써주지 않습니다.
+
+## 설치
+
+Claude Code에서:
 
 ```
 /plugin marketplace add DS3693/papertrail
 /plugin install papertrail@papertrail
 ```
 
-Then restart Claude Code, and run `/papertrail:init` in a project to opt it in. See [QUICKSTART.md](QUICKSTART.md) for a walkthrough.
+재시작 후, 프로젝트에서 `/papertrail:init`을 실행해 opt-in 합니다. 자세한 walkthrough는 [QUICKSTART.md](QUICKSTART.md)를 참고하세요.
 
-The core plan-review-execute-tail workflow needs only `python3` (no dependencies); `/sync` is the manual recovery checkpoint. The optional private web sharing additionally needs Node.js. Updating, pinning to a specific version, silencing update notices, and everything else is in the [reference](docs/reference.md).
+핵심 plan-review-execute 루프는 `python3`만 있으면 됩니다 (의존성 없음). 로스터 서버와 개인 웹 공유는 Node.js와 Vercel 계정이 추가로 필요합니다.
 
-## Reference
+## 현재 상태 (v0.2.0)
 
-Everything technical lives in **[docs/reference.md](docs/reference.md)**: the full command table, the board in depth (live vs. snapshot, every view, sharing and private web publishing), results bundles, model profiles, the sign-off gate, what the plugin creates in your project, updating and version pinning, and how to develop the board itself.
+- **테스트**: Python `pytest` 474 passed (Windows 로케일/경로 관련 무관한 사전 존재 실패 31건 제외), 보드 UI 519/519, `classroom-template` 123/123, `web-template` 46/46.
+- **실배포로 검증됨**: 로스터 서버는 실제 Vercel에 배포해 학생별 토큰 발급, 서버측 재검증(조작된 제출물의 checksum/점수 불일치 탐지), 학생 간 유사도 탐지(표절 의심 제출물 탐지)까지 end-to-end로 확인했습니다.
+- **아직 하지 않은 것**: 실제 수업에 투입해 여러 실제 학생과 함께 사용해본 적은 없습니다. `/papertrail:host --init`의 Vercel Firewall rate-limit 설정 등 일부 운영 단계는 데모 배포에서는 생략했습니다 — 실제 수업 배포 전에는 [docs/hosting-the-roster.md](docs/hosting-the-roster.md)를 따라 완료해야 합니다.
 
-## License
+## 참고 문서
 
-[PolyForm Noncommercial License 1.0.0](LICENSE). Free to use, modify, and share for any **noncommercial** purpose — academic research, teaching, personal, and non-profit use all qualify. Commercial use is not permitted without a separate license.
+- **[docs/reference.md](docs/reference.md)** — 전체 커맨드 표, 보드 상세(라이브 vs 스냅샷, 모든 뷰, 공유와 개인 웹 배포), 결과물 번들, 모델 프로필, 사인오프 게이트, 플러그인이 프로젝트에 만드는 것, 업데이트와 버전 고정.
+- **[docs/hosting-the-board.md](docs/hosting-the-board.md)** — 학생 한 명의 보드를 개인 링크로 공유하는 법.
+- **[docs/hosting-the-roster.md](docs/hosting-the-roster.md)** — 🆕 교수자용 로스터 서버를 배포·운영하는 법, 데이터·프라이버시 유의사항.
+- **[docs/plan-rubric.md](docs/plan-rubric.md)** — 5채널 rubric 전문.
+- **[AGENTS.md](AGENTS.md)** — 이 저장소에서 작업할 미래의 에이전트/기여자를 위한 학술 진정성 설계 원칙 요약.
+
+## 라이선스
+
+[PolyForm Noncommercial License 1.0.0](LICENSE). 학술 연구, 교육, 개인, 비영리 목적을 포함한 모든 **비상업적** 용도로 자유롭게 사용·수정·공유할 수 있습니다. 상업적 사용은 별도 라이선스 없이는 허용되지 않습니다.
