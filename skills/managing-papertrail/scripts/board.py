@@ -828,7 +828,7 @@ def collect_payload(root, mode, focus):
         if mp is not None:
             payload["modelProfile"] = mp
 
-    collaborator_facing = mode in ("remote", "hosted")
+    collaborator_facing = mode in ("remote", "hosted", "submission")
     if not collaborator_facing:
         # Researcher-only hygiene flags; kept out of collaborator shares.
         payload["drift"] = collect_drift(
@@ -1911,6 +1911,25 @@ def render_hosted_html(root):
     payload["mode"] = "hosted"
     build_assets(root, payload)
     return inject(template_path().read_text(encoding="utf-8"), payload)
+
+
+def render_roster_html():
+    """Render the classroom roster dashboard shell: the same single-file board
+    bundle used everywhere else, but with no embedded payload — the roster
+    shell (board/src/RosterApp.tsx) fetches /api/roster live from the
+    classroom server instead of reading an injected <script id="board-data">
+    slot. The root div is marked data-papertrail-mode="roster" so
+    board/src/main.tsx mounts the roster shell instead of the single-project
+    board (see board/src/main.tsx's dataset check). This is the classroom
+    server's counterpart to render_hosted_html(); unlike that function, it
+    takes no project root and injects no payload."""
+    html = template_path().read_text(encoding="utf-8")
+    marker = '<div id="root"></div>'
+    replacement = '<div id="root" data-papertrail-mode="roster"></div>'
+    if html.count(marker) != 1:
+        die("board template's root div not found in the expected form — "
+            "reinstall the papertrail plugin")
+    return html.replace(marker, replacement, 1)
 
 
 def materialize_web_dir(root):

@@ -1,0 +1,160 @@
+// Content-addressed, immutable submission storage.
+//
+//   submissions/<studentId>/<idempotencyKey>.json   the full envelope + serverReceivedAt + reverify
+//   submissions/<studentId>/_latest.json            overwritable pointer {idempotencyKey, submittedAt}
+//
+// Staging-less by design: the key IS the idempotencyKey (submit.py's
+// share_hash, a content hash), so two different contents simply land at two
+// different keys — there is no in-place mutation to protect against the way
+// blobstore.ts's putComment protects a fixed comment id. The immutable
+// content record is always written FIRST; the movable pointer is advanced
+// only after that resolves — the same "immutable record, then a movable
+// pointer" shape as results.py's stage-then-atomic-rename, adapted to a
+// content-addressed store (there is no rename here, just a pointer flip).
+import { put, get, list } from "@vercel/blob";
+import type { ReverifyCheck } from "./reverify.js";
+import type { GitExcerpt } from "./validate.js";
+
+const SUBMISSIONS_PREFIX = "submissions/";
+
+export interface StoredSubmission {
+  studentId: string;
+  envelopeSchemaVersion: number;
+  submittedAt: string;
+  courseId: string | null;
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+  gitExcerpt: GitExcerpt;
+  serverReceivedAt: string;
+  reverify: ReverifyCheck[];
+}
+
+export interface LatestPointer {
+  idempotencyKey: string;
+  submittedAt: string;
+}
+
+function submissionPath(studentId: string, key: string): string {
+  return `${SUBMISSIONS_PREFIX}${studentId}/${key}.json`;
+}
+function latestPointerPath(studentId: string): string {
+  return `${SUBMISSIONS_PREFIX}${studentId}/_latest.json`;
+}
+
+async function readJsonBlob<T>(blobToken: string, pathname: string): Promise<T | null> {
+  const result = await get(pathname, { access: "private", token: blobToken });
+  if (result?.statusCode !== 200) return null;
+  try {
+    return JSON.parse(await new Response(result.stream).text()) as T;
+  } catch {
+    return null;
+  }
+}
+
+// Same canonical-JSON content comparison shape as web-template's
+// blobstore.ts putComment — sorted keys so field order never causes a false
+// "conflict".
+function canonicalJson(value: unknown): string {
+  const normalize = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(normalize);
+    if (v && typeof v === "object") {
+      return Object.fromEntries(
+        Object.entries(v as Record<string, unknown>)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, item]) => [key, normalize(item)]),
+      );
+    }
+    return v;
+  };
+  return JSON.stringify(normalize(value));
+}
+
+// Compares everything the CLIENT controls, not server-added bookkeeping:
+// `serverReceivedAt` varies by request time, and `reverify` is freshly
+// recomputed on every POST before this comparison ever runs (see
+// api/submissions.ts) — a replay must return the PREVIOUSLY computed
+// reverify result, not the fresh one, so it is excluded from the equality
+// check and read back from the stored (pre-existing) record instead.
+function sameSubmissionContent(a: StoredSubmission, b: StoredSubmission): boolean {
+  const strip = (s: StoredSubmission) => {
+    const { serverReceivedAt: _s, reverify: _r, ...rest } = s;
+    return rest;
+  };
+  return canonicalJson(strip(a)) === canonicalJson(strip(b));
+}
+
+export type PutSubmissionResult =
+  | { outcome: "created"; stored: StoredSubmission }
+  | { outcome: "replay"; stored: StoredSubmission }
+  | { outcome: "conflict"; stored: StoredSubmission };
+
+export async function putSubmission(
+  blobToken: string,
+  studentId: string,
+  key: string,
+  submission: StoredSubmission,
+): Promise<PutSubmissionResult> {
+  const pathname = submissionPath(studentId, key);
+  const existing = await readJsonBlob<StoredSubmission>(blobToken, pathname);
+  if (existing) {
+    return { outcome: sameSubmissionContent(existing, submission) ? "replay" : "conflict", stored: existing };
+  }
+  try {
+    await put(pathname, JSON.stringify(submission), {
+      access: "private", allowOverwrite: false, contentType: "application/json", token: blobToken,
+    });
+    return { outcome: "created", stored: submission };
+  } catch (error) {
+    // Another request may have won the create-only race. Read the winner
+    // and classify it by content, exactly as blobstore.ts's putComment does.
+    const raced = await readJsonBlob<StoredSubmission>(blobToken, pathname);
+    if (!raced) throw error;
+    return { outcome: sameSubmissionContent(raced, submission) ? "replay" : "conflict", stored: raced };
+  }
+}
+
+export async function advanceLatestPointer(
+  blobToken: string,
+  studentId: string,
+  pointer: LatestPointer,
+): Promise<void> {
+  await put(latestPointerPath(studentId), JSON.stringify(pointer), {
+    access: "private", allowOverwrite: true, contentType: "application/json", token: blobToken,
+  });
+}
+
+export async function getLatestPointer(blobToken: string, studentId: string): Promise<LatestPointer | null> {
+  return readJsonBlob<LatestPointer>(blobToken, latestPointerPath(studentId));
+}
+
+export async function getSubmission(
+  blobToken: string,
+  studentId: string,
+  key: string,
+): Promise<StoredSubmission | null> {
+  return readJsonBlob<StoredSubmission>(blobToken, submissionPath(studentId, key));
+}
+
+// All of a student's submissions, newest-first by submittedAt. Used by
+// GET /api/submissions/:studentId (full history). Small per-course volumes
+// are expected, so this is a plain list()+get() sweep with no extra index —
+// documented simplification, not a scalability guarantee.
+export async function listSubmissionsForStudent(
+  blobToken: string,
+  studentId: string,
+): Promise<StoredSubmission[]> {
+  const prefix = `${SUBMISSIONS_PREFIX}${studentId}/`;
+  const out: StoredSubmission[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await list({ token: blobToken, prefix, cursor, limit: 1000 });
+    for (const b of page.blobs) {
+      if (b.pathname.endsWith("/_latest.json")) continue;
+      const sub = await readJsonBlob<StoredSubmission>(blobToken, b.pathname);
+      if (sub) out.push(sub);
+    }
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  out.sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : a.submittedAt > b.submittedAt ? -1 : 0));
+  return out;
+}

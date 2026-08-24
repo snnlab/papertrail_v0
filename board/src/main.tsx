@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import RosterApp from "./RosterApp";
 import ErrorBoundary from "./components/ErrorBoundary";
 import type { BoardData } from "./lib/types";
 import "./index.css";
@@ -39,13 +40,32 @@ function NoData() {
   );
 }
 
-let data = readSlot();
-if (!data && import.meta.env.DEV) {
-  data = (await import("./dev-data")).devData;
-}
+const rootEl = document.getElementById("root")!;
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ErrorBoundary>{data ? <App data={data} /> : <NoData />}</ErrorBoundary>
-  </StrictMode>,
-);
+// Classroom roster dashboard (Phase 2, instructor-hosted server): the
+// classroom server's own dashboard HTML marks its mount point with
+// data-papertrail-mode="roster" instead of injecting a #board-data payload —
+// there is no single embedded project here, so RosterApp fetches RosterData
+// live from /api/roster instead. This is the ONLY change this file makes for
+// Phase 2: the single-project path below (#board-data / dev-data) is
+// untouched and runs exactly as before whenever this attribute is absent.
+if (rootEl.dataset.papertrailMode === "roster") {
+  createRoot(rootEl).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <RosterApp />
+      </ErrorBoundary>
+    </StrictMode>,
+  );
+} else {
+  let data = readSlot();
+  if (!data && import.meta.env.DEV) {
+    data = (await import("./dev-data")).devData;
+  }
+
+  createRoot(rootEl).render(
+    <StrictMode>
+      <ErrorBoundary>{data ? <App data={data} /> : <NoData />}</ErrorBoundary>
+    </StrictMode>,
+  );
+}

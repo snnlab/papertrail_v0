@@ -37,6 +37,7 @@ Before completing a code change, run:
 python3 -m pytest tests/ -q
 (cd board && npm test && npx tsc --noEmit)
 (cd skills/managing-papertrail/assets/web-template && npm test)
+(cd skills/managing-papertrail/assets/classroom-template && npm test && npx tsc --noEmit)
 ```
 
 If `board/src/` changes, run `cd board && npm run build`. Commit the regenerated
