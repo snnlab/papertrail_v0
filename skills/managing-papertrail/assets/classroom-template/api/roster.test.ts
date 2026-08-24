@@ -162,6 +162,38 @@ describe("GET /api/roster", () => {
     const secondRow = (second.json as { students: Record<string, unknown>[] }).students[0];
     expect(secondRow.isNewSinceLastView).toBe(false);
   });
+
+  it("compares submittedAt and lastViewed as instants, not raw strings — a non-UTC offset must not misorder them", async () => {
+    // submit.py's submittedAt carries the STUDENT's local UTC offset (e.g.
+    // datetime.now().astimezone().isoformat()), never normalized to 'Z'.
+    // "2026-08-25T01:00:00+09:00" is 2026-08-24T16:00:00Z — chronologically
+    // BEFORE "2026-08-24T17:00:00.000Z" — even though it sorts AFTER it as a
+    // bare string (the date digit '5' > '4'). A correct implementation must
+    // read this submission as NOT new; a lexical-string-comparison bug reads
+    // it as new. This regression-tests exactly the shape submit.py produces.
+    const submittedAtLocalOffset = "2026-08-25T01:00:00+09:00"; // == 2026-08-24T16:00:00.000Z
+    const lastViewedUtc = "2026-08-24T17:00:00.000Z"; // later in real time
+    list.mockImplementation(async (opts: { prefix: string }) => {
+      if (opts.prefix === "roster/") return { blobs: [{ pathname: "roster/alice.json" }], hasMore: false };
+      return { blobs: [], hasMore: false };
+    });
+    get.mockImplementation(async (pathname: string) => {
+      if (pathname === "roster/alice.json") {
+        return { statusCode: 200, stream: streamOf({ studentId: "alice", displayName: "Alice", tokenHash: "h", createdAt: "x" }) };
+      }
+      if (pathname === "roster-meta/last-viewed.json") return { statusCode: 200, stream: streamOf({ timestamp: lastViewedUtc }) };
+      if (pathname === "submissions/alice/_latest.json") {
+        return { statusCode: 200, stream: streamOf({ idempotencyKey: "key1", submittedAt: submittedAtLocalOffset }) };
+      }
+      if (pathname === "submissions/alice/key1.json") {
+        return { statusCode: 200, stream: streamOf({ studentId: "alice", submittedAt: submittedAtLocalOffset, idempotencyKey: "key1", reverify: [], payload: { files: { executionPlans: [] } } }) };
+      }
+      return null;
+    });
+    const r = await run("GET", authedHeaders(), undefined, ENV, NOW);
+    const row = (r.json as { students: Record<string, unknown>[] }).students[0];
+    expect(row.isNewSinceLastView).toBe(false);
+  });
 });
 
 describe("POST /api/roster", () => {

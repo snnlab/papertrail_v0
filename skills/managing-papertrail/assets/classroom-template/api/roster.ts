@@ -62,8 +62,17 @@ async function buildRosterRow(
       artifact: f.artifact,
     }));
 
+  // Compared as actual instants, not raw strings: submittedAt comes from
+  // submit.py's datetime.now().astimezone().isoformat() — the STUDENT's
+  // local UTC offset (e.g. +09:00), not normalized to 'Z' — while lastViewed
+  // is always this server's own new Date().toISOString() ('Z'). Two ISO
+  // strings only sort correctly by lexical comparison when they share the
+  // same offset; a bare string `>` here was confirmed wrong in practice (a
+  // 2026-08-25T01:xx+09:00 submission read as "after" a same-instant-ish
+  // 2026-08-24T17:xxZ lastViewed, only because '5' > '4' character-wise).
   const isNewSinceLastView = !!(
-    lastSubmission && (!lastViewed || String(lastSubmission.submittedAt) > lastViewed)
+    lastSubmission
+    && (!lastViewed || Date.parse(String(lastSubmission.submittedAt)) > Date.parse(lastViewed))
   );
 
   return {
