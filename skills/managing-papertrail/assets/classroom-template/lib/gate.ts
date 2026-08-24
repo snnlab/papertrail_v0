@@ -20,6 +20,14 @@ export function gateDecision(
   // lib/roster.ts's resolveToken; an invalid/missing token gets its own
   // 401 { error: "invalid_token" } from that handler, not this gate.
   if (pathname === "/api/submissions") return { action: "allow" };
+  // GET/POST /api/comments serves BOTH an instructor's browser session and a
+  // student's own bearer token (their own comments only, checked in
+  // api/comments.ts against the submission-index — never trusted from the
+  // request alone). Like /api/submissions, the cookie gate has nothing
+  // useful to say here; api/comments.ts enforces the real authorization
+  // (instructor session, or a bearer token scoped to its own shareHash) and
+  // returns its own 401/403 when neither holds.
+  if (pathname === "/api/comments") return { action: "allow" };
   if (authed) return { action: "allow" };
   if (pathname.startsWith("/api/")) return { action: "unauthorizedJson" };
   return { action: "loginPage" };

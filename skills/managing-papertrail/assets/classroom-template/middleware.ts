@@ -76,8 +76,15 @@ function isPreAuthRoute(pathname: string): boolean {
 // the `Authorization: Bearer <token>` header, verified inside the handler
 // itself (lib/roster.ts's resolveToken). Students never get a cookie this
 // round, so this route must never be routed into the instructor login page.
+//
+// GET/POST /api/comments serves both an instructor's browser session AND a
+// student's own bearer token (reading their own submission's comments) —
+// api/comments.ts does its own instructor-vs-bearer authorization per
+// method, exactly as api/submissions.ts does for the bearer-only route
+// above. Keep this in sync with lib/gate.ts's gateDecision, which makes the
+// identical exemption for the identical reason.
 function isBearerTokenRoute(pathname: string): boolean {
-  return pathname === "/api/submissions";
+  return pathname === "/api/submissions" || pathname === "/api/comments";
 }
 
 // Keep this self-contained copy in sync with lib/loginPage.ts. The

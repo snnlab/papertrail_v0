@@ -62,6 +62,14 @@ describe("middleware default export", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it("continues an unauthenticated GET/POST to /api/comments (bearer route, checked in the handler itself)", () => {
+    const get = middleware(new Request("https://roster.example/api/comments?shareHash=x"));
+    expect(get?.status).toBe(204);
+    const post = middleware(new Request("https://roster.example/api/comments", { method: "POST" }));
+    expect(post?.status).toBe(204);
+    expect(next).toHaveBeenCalledTimes(2);
+  });
+
   it("returns the login page for an unauthenticated page request", async () => {
     const response = middleware(new Request("https://roster.example/"));
     const html = await response?.text();
@@ -95,7 +103,7 @@ describe("inlined auth parity", () => {
   });
 
   it("matches lib/gate.ts's gateDecision for the exempt/gated route split", () => {
-    const routes = ["/api/login", "/api/logout", "/api/submissions", "/api/submissions/alice", "/api/roster", "/"];
+    const routes = ["/api/login", "/api/logout", "/api/submissions", "/api/submissions/alice", "/api/comments", "/api/roster", "/"];
     for (const pathname of routes) {
       const response = middleware(new Request(`https://roster.example${pathname}`));
       const decision = gateDecision(pathname, "GET", false);

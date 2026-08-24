@@ -17,6 +17,10 @@ describe("gateDecision", () => {
   it("does NOT exempt /api/submissions/:studentId — that route is instructor-only", () => {
     expect(gateDecision("/api/submissions/alice", "GET", false).action).toBe("unauthorizedJson");
   });
+  it("always allows /api/comments without the instructor cookie (student bearer token route too)", () => {
+    expect(gateDecision("/api/comments", "GET", false).action).toBe("allow");
+    expect(gateDecision("/api/comments", "POST", false).action).toBe("allow");
+  });
   it("serves the login PAGE for an unauthenticated page request", () => {
     expect(gateDecision("/", "GET", false).action).toBe("loginPage");
     expect(gateDecision("/index.html", "GET", false).action).toBe("loginPage");
