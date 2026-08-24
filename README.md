@@ -131,6 +131,8 @@ PaperTrail은 특정한 작업에 적합하지, AI를 만지는 모든 사람을
 
 **일회성 탐색 작업에는 맞지 않습니다** — 금요일이면 잊어버릴 질문에 답하는 간단한 그래프 하나는 durable record가 필요 없고, 워크플로우는 그저 마찰이 됩니다.
 
+**양적 분석 논문만을 위한 도구가 아닙니다.** `/papertrail:init`은 시작하자마자 "양적 분석입니까, 문헌고찰입니까?"를 먼저 묻습니다. 문헌고찰(체계적/PRISMA 방식)을 선택하면 검색 전략·스크리닝·추출·질 평가·종합이라는 문헌고찰 고유의 방법론에 맞춰 컴포넌트 예시와 `CLAUDE.md` 규약(산출물 형식, 증거 기준)이 자동으로 바뀝니다 — 계획-서명-검증 구조와 rubric 채점 자체는 두 유형 모두 완전히 동일합니다. 자세한 예시는 [docs/review-papers.md](docs/review-papers.md)를 참고하세요.
+
 ## 원칙
 
 - 계획은 작업 전에 쓰이고 그것을 통제합니다. 계획은 사전등록이 아니라 개정 절차가 내장된 계약입니다: 기록된 리비전은 정당하고 예상된 것이며, 조용한 이탈만이 위반입니다.
@@ -163,6 +165,7 @@ Claude Code에서:
 - **[docs/hosting-the-board.md](docs/hosting-the-board.md)** — 학생 한 명의 보드를 개인 링크로 공유하는 법.
 - **[docs/hosting-the-roster.md](docs/hosting-the-roster.md)** — 🆕 교수자용 로스터 서버를 배포·운영하는 법, 데이터·프라이버시 유의사항.
 - **[docs/plan-rubric.md](docs/plan-rubric.md)** — 5채널 rubric 전문.
+- **[docs/review-papers.md](docs/review-papers.md)** — 🆕 문헌고찰(체계적/PRISMA 방식) 논문 워크스루 — 컴포넌트·의사결정 로그·결과물 번들 예시.
 - **[AGENTS.md](AGENTS.md)** — 이 저장소에서 작업할 미래의 에이전트/기여자를 위한 학술 진정성 설계 원칙 요약.
 
 ## 라이선스

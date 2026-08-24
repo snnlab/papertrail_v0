@@ -2,7 +2,7 @@
 
 This is the short path from install to your first plan-review-execute-tail loop. It assumes Claude Code is installed and you have a paper project (new or ongoing) in a folder, ideally a git repository. For what the plugin is and why you'd use it, see the [README](README.md); for the full reference on every command and the board, see [docs/reference.md](docs/reference.md).
 
-Throughout, we'll use a running example from a sociology quantitative-methods course: a student comparing a cross-lagged panel model (CLPM) against a random-intercept cross-lagged panel model (RI-CLPM) for a longitudinal question about social status and well-being.
+Throughout, we'll use a running example from a sociology quantitative-methods course: a student comparing a cross-lagged panel model (CLPM) against a random-intercept cross-lagged panel model (RI-CLPM) for a longitudinal question about social status and well-being. **Writing a literature review instead?** The mechanics below are identical — only the examples are quant-flavored — see [docs/review-papers.md](docs/review-papers.md) for the equivalent walkthrough (search strategy, screening, extraction, PRISMA diagram).
 
 ## 1. Install the plugin
 

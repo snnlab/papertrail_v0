@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.0] - 2026-08-25
+
+Adds a second supported paper type: a literature review (systematic/PRISMA-style), alongside the original quantitative-analysis paper. This was already almost entirely supported — the execution-plan template, the results-bundle schema (`producedBy: null`, `kind: "other"`), and the five-channel rubric were already written in method-agnostic language — so this is a prose/template change, not a code or schema change.
+
+### Added
+- **`/papertrail:init` now asks the paper's type first** — quantitative or literature review — as its own single-question round before the usual interview, stored as `Paper type:` in `plans/master-plan.md`. The answer decides which `CLAUDE.md` conventions block gets installed and how the components table's second column is labeled ("Analysis step" vs. "Review step" — a display label only, parsed by no code).
+- **`skills/managing-papertrail/templates/claude-md-section-review.md`** — a review-paper variant of the CLAUDE.md conventions block. Identical to the existing `claude-md-section.md` in every rule except 7 (output conventions: a PRISMA flow diagram, an extraction table that may belong in a supplementary/appendix file, and a narrative-synthesis paragraph are now named as legitimate deliverable shapes) and 9 (evidence-before-claims: phrased around a search/screening/extraction pass instead of code execution). Rules 1–6, 8, 10, 11 — the workflow governance itself — are byte-identical between the two files.
+- **`docs/review-papers.md`** — a worked systematic-review walkthrough parallel to `QUICKSTART.md`'s quantitative example: example components (search-strategy, screening, extraction, quality-appraisal, synthesis), a decision-log entry example, and a results-bundle example using the schema's existing `producedBy: null`/`kind: "other"` conventions for hand-produced artifacts.
+- `commands/init.md` step 4's component-derivation guidance now proposes review-methodology stages when `paperType: review`, instead of quantitative-analysis steps.
+
 ## [0.3.0] - 2026-08-25
 
 Closes a gap in the roster server (v0.2.0): drilling into a student's board from the roster dashboard had no way to actually leave a comment, and nothing told a student one had been left. Both are now real, in keeping with the existing "no push notifications anywhere in this tool" design: the instructor's comment is stored, and a student finds out only by running `/papertrail:submit`, which now also checks their own submissions for anything new.
