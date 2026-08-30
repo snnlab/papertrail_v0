@@ -70,6 +70,12 @@ describe("middleware default export", () => {
     expect(next).toHaveBeenCalledTimes(2);
   });
 
+  it("continues an unauthenticated GET to /api/my-comments (bearer-only route, checked in the handler itself)", () => {
+    const response = middleware(new Request("https://roster.example/api/my-comments"));
+    expect(response?.status).toBe(204);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
   it("returns the login page for an unauthenticated page request", async () => {
     const response = middleware(new Request("https://roster.example/"));
     const html = await response?.text();
@@ -103,7 +109,7 @@ describe("inlined auth parity", () => {
   });
 
   it("matches lib/gate.ts's gateDecision for the exempt/gated route split", () => {
-    const routes = ["/api/login", "/api/logout", "/api/submissions", "/api/submissions/alice", "/api/comments", "/api/roster", "/"];
+    const routes = ["/api/login", "/api/logout", "/api/submissions", "/api/submissions/alice", "/api/comments", "/api/my-comments", "/api/roster", "/"];
     for (const pathname of routes) {
       const response = middleware(new Request(`https://roster.example${pathname}`));
       const decision = gateDecision(pathname, "GET", false);

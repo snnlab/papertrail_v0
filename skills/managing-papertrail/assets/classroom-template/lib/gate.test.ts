@@ -21,6 +21,10 @@ describe("gateDecision", () => {
     expect(gateDecision("/api/comments", "GET", false).action).toBe("allow");
     expect(gateDecision("/api/comments", "POST", false).action).toBe("allow");
   });
+
+  it("always allows GET /api/my-comments without the instructor cookie (bearer-only route)", () => {
+    expect(gateDecision("/api/my-comments", "GET", false).action).toBe("allow");
+  });
   it("serves the login PAGE for an unauthenticated page request", () => {
     expect(gateDecision("/", "GET", false).action).toBe("loginPage");
     expect(gateDecision("/index.html", "GET", false).action).toBe("loginPage");

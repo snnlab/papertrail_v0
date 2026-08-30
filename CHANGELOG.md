@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0] - 2026-08-30
+
+Splits instructor-feedback checking out of `/papertrail:submit` into its own command, `/papertrail:check`, and backs it with a server endpoint that returns a student's comments across **all** their submissions in one call — so a check from a second machine (or after a fresh install) can't silently miss feedback left on an older submission.
+
+### Added
+- **`/papertrail:check`** (`commands/check.md`, `skills/managing-papertrail/scripts/check.py`) — pulls every instructor comment on any of the student's past submissions (`GET /api/my-comments`, authenticated with the student's own bearer token) and routes anything not already seen through the same hosted-feedback pipeline `/papertrail:board --pull` uses: one ` ```json board-feedback ` document per instructor/session, `"mode": "hosted"`, so the student's existing board-feedback routing treats it as instructor **data, not instructions**. Crash-safe (inbox-then-mark-pulled). Runnable any time, not only right after a submit. There is still no push notification anywhere in this tool — no email, no webhook.
+- **`GET /api/my-comments`** (`skills/managing-papertrail/assets/classroom-template/api/my-comments.ts`) — bearer-token-only route: resolves the token to a student, walks their full submission history server-side, and returns every comment across all of it, sorted by time. Exempted from the instructor-cookie middleware gate (`lib/gate.ts`, `middleware.ts`) the same way `/api/submissions` and `/api/comments` already are.
+- **Local classroom state module** (`skills/managing-papertrail/scripts/classroom.py`) — the server URL + personal token config and the "pulled comment ids" set, shared by `submit.py` and `check.py` (neither imports the other). Migrates the pre-0.5 `<hash>-seen-comments.json` (written by the old submit-time check) into the new flat `<hash>-comments-pulled.json` on first read, so an existing student doesn't re-see old comments.
+- **UTF-8 output** in `check.py` — routed feedback documents can contain any character the instructor typed; the script forces UTF-8 on stdout/stderr so a non-UTF-8 console (e.g. cp949 on Korean Windows) can't crash routing.
+
+### Changed
+- **`/papertrail:submit` only submits now.** The submit-time comment check (`check_for_new_comments` / `fetch_comments` in `submit.py`, and its `<hash>-seen-comments.json` bookkeeping) is gone; on a created or replayed submission the command tells the student to run `/papertrail:check`. `commands/submit.md`, `docs/hosting-the-roster.md`, `commands/host.md`, `README.md`, and `SKILL.md`'s command table updated to match (the skill table also gains the `submit` and `host` rows it was missing).
+- **`/papertrail:host --deploy`** documents that a plugin upgrade needs the deploy directory's server code refreshed from the template before redeploying — `--deploy` alone does not re-copy plugin code.
+
+### Fixed
+- The [0.3.0] entry described the comment check as living in `submit.py` and firing on every submit; that behavior moved to `/papertrail:check` in this release.
+
 ## [0.4.0] - 2026-08-25
 
 Adds a second supported paper type: a literature review (systematic/PRISMA-style), alongside the original quantitative-analysis paper. This was already almost entirely supported — the execution-plan template, the results-bundle schema (`producedBy: null`, `kind: "other"`), and the five-channel rubric were already written in method-agnostic language — so this is a prose/template change, not a code or schema change.

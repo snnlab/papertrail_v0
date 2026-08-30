@@ -83,8 +83,13 @@ function isPreAuthRoute(pathname: string): boolean {
 // method, exactly as api/submissions.ts does for the bearer-only route
 // above. Keep this in sync with lib/gate.ts's gateDecision, which makes the
 // identical exemption for the identical reason.
+//
+// GET /api/my-comments is bearer-only (no instructor session concept at
+// all) — a student's own comments across every one of their submissions.
+// api/my-comments.ts does its own token resolution; same reason for the
+// exemption as the two routes above.
 function isBearerTokenRoute(pathname: string): boolean {
-  return pathname === "/api/submissions" || pathname === "/api/comments";
+  return pathname === "/api/submissions" || pathname === "/api/comments" || pathname === "/api/my-comments";
 }
 
 // Keep this self-contained copy in sync with lib/loginPage.ts. The

@@ -28,6 +28,10 @@ export function gateDecision(
   // (instructor session, or a bearer token scoped to its own shareHash) and
   // returns its own 401/403 when neither holds.
   if (pathname === "/api/comments") return { action: "allow" };
+  // GET /api/my-comments is bearer-only (no instructor session concept at
+  // all) — api/my-comments.ts resolves and checks the token itself. Same
+  // reasoning as the two exemptions above.
+  if (pathname === "/api/my-comments") return { action: "allow" };
   if (authed) return { action: "allow" };
   if (pathname.startsWith("/api/")) return { action: "unauthorizedJson" };
   return { action: "loginPage" };

@@ -85,7 +85,7 @@ They never get a login page or a password for this server — their only credent
 
 Clicking into a student's row on the roster dashboard opens their board exactly as they'd see it themselves, with commenting turned on — select text, leave a comment, the same flow as a `--publish-web` collaborator link. A row marked **new** was submitted since your last visit to the dashboard, so you don't have to remember what you've already looked at.
 
-There is no push notification anywhere in this tool — no email, no webhook, nothing that reaches a student on its own. A comment you leave sits on the server until the student's own `/papertrail:submit` checks for it, the next time they run it, using their own personal token (never yours, and never another student's). If you need a student to see something before they'd naturally submit again, tell them directly — the same as you would for any other feedback.
+There is no push notification anywhere in this tool — no email, no webhook, nothing that reaches a student on its own. A comment you leave sits on the server until the student runs **`/papertrail:check`**, which pulls every comment left on any of their past submissions using their own personal token (never yours, and never another student's) and routes anything new into their session as feedback. It is a separate command from `/papertrail:submit` — a student can run it any time, not only right after submitting. If you need a student to see something before they'd naturally check, tell them directly — the same as you would for any other feedback.
 
 ## Data and privacy
 

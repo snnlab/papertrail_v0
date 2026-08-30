@@ -20,11 +20,9 @@ environment, or server-rejection error.
 import argparse
 import datetime
 import json
-import os
 import subprocess
 import sys
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -36,8 +34,8 @@ from board import (  # noqa: E402
     share_hash,
     payload_files,
     find_root,
-    web_project_hash,
 )
+import classroom  # noqa: E402
 
 ENVELOPE_SCHEMA_VERSION = 1
 # Vercel's default serverless function request body limit — a soft warning
@@ -48,64 +46,6 @@ SIZE_WARNING_BYTES = int(4.5 * 1024 * 1024)
 def die(msg, code=1):
     print("submit: %s" % msg, file=sys.stderr)
     sys.exit(code)
-
-
-# --- Local classroom config (student's server URL + personal token) ---
-# Mirrors board.py's read_web_config/write_web_config exactly, but under a
-# separate "classroom" namespace so it never collides with the existing
-# single-shared-password web-board config.
-
-def _classroom_data_dir():
-    base = os.environ.get("CLAUDE_PLUGIN_DATA")
-    d = Path(base) / "classroom" if base else Path.home() / ".papertrail" / "classroom"
-    return d
-
-
-def classroom_config_path(root):
-    return _classroom_data_dir() / ("%s.json" % web_project_hash(root))
-
-
-def read_classroom_config(root):
-    name = "%s.json" % web_project_hash(root)
-    try:
-        return json.loads((_classroom_data_dir() / name).read_text())
-    except (OSError, ValueError):
-        return None
-
-
-def write_classroom_config(root, cfg):
-    p = classroom_config_path(root)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(cfg))
-    os.chmod(p, 0o600)
-
-
-# --- Locally remembered "seen" instructor comments, keyed by shareHash ---
-# The student is never pushed a notification (no email, no webhook — this
-# tool sends nothing on its own); instead, every /papertrail:submit run
-# pulls and prints any instructor comments the student hasn't seen yet, the
-# same "check when you next use the tool" pattern board.py's own --pull
-# already established for the single-project hosted board. Keyed by
-# shareHash (== idempotencyKey) rather than a single flat list, so comments
-# on an OLDER submission are never silently dropped just because a newer
-# one was made in the meantime.
-
-def seen_comments_path(root):
-    return _classroom_data_dir() / ("%s-seen-comments.json" % web_project_hash(root))
-
-
-def read_seen_comments(root):
-    try:
-        return json.loads(seen_comments_path(root).read_text())
-    except (OSError, ValueError):
-        return {}
-
-
-def write_seen_comments(root, seen):
-    p = seen_comments_path(root)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(seen))
-    os.chmod(p, 0o600)
 
 
 # --- Git log excerpt (plans/ only — hash/author-date/author/subject, no diffs) ---
@@ -329,51 +269,6 @@ def print_reverify(entries):
         print(line)
 
 
-def fetch_comments(url, token, share_hash_value):
-    """GET /api/comments?shareHash=... with the student's own bearer token.
-    Never raises — a comment-check failure (network, auth, server down)
-    must never break the submit flow that triggered it; returns [] on any
-    problem, same "fail open to nothing" shape as git_log_excerpt()."""
-    endpoint = url.rstrip("/") + "/api/comments?shareHash=" + urllib.parse.quote(share_hash_value, safe="")
-    req = urllib.request.Request(
-        endpoint, method="GET", headers={"Authorization": "Bearer %s" % token}
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            if resp.getcode() != 200:
-                return []
-            data = json.loads(resp.read().decode("utf-8", "replace"))
-            return data.get("comments", [])
-    except Exception:
-        return []
-
-
-def check_for_new_comments(root, url, token, share_hash_value):
-    comments = fetch_comments(url, token, share_hash_value)
-    if not comments:
-        return
-    seen_all = read_seen_comments(root)
-    seen = set(seen_all.get(share_hash_value, []))
-    new = [c for c in comments if c.get("id") and c.get("id") not in seen]
-    if new:
-        new.sort(key=lambda c: c.get("receivedAt", ""))
-        print("")
-        print("Instructor feedback (%d new):" % len(new))
-        for c in new:
-            author = c.get("author") or "instructor"
-            when = (c.get("receivedAt") or "")[:16].replace("T", " ")
-            annotation = c.get("annotation") or {}
-            text = annotation.get("comment") or "(no comment text)"
-            quote = annotation.get("quote") or annotation.get("excerpt")
-            print("  - %s%s" % (author, (" · %s" % when) if when else ""))
-            if quote:
-                print('      on: "%s"' % (quote[:120]))
-            print("      %s" % text)
-        print("  Open /papertrail:board to see full context or reply.")
-    seen_all[share_hash_value] = [c["id"] for c in comments if c.get("id")]
-    write_seen_comments(root, seen_all)
-
-
 def _read_error_body(exc):
     try:
         return json.loads(exc.read().decode("utf-8", "replace"))
@@ -381,7 +276,7 @@ def _read_error_body(exc):
         return {}
 
 
-def submit_envelope(root, url, token, envelope):
+def submit_envelope(url, token, envelope):
     endpoint = url.rstrip("/") + "/api/submissions"
     body = json.dumps(envelope).encode("utf-8")
     req = urllib.request.Request(
@@ -409,14 +304,14 @@ def submit_envelope(root, url, token, envelope):
             "again."
         )
         return
-    _handle_response(root, url, token, code, data)
+    _handle_response(code, data)
 
 
-def _handle_response(root, url, token, code, data):
+def _handle_response(code, data):
     if code == 201 and data.get("status") == "created":
         print("Submitted — new submission %s recorded." % data.get("submissionId", "?"))
         print_reverify(data.get("reverify", []))
-        check_for_new_comments(root, url, token, data.get("submissionId", ""))
+        print("Run /papertrail:check to see any instructor feedback.")
         sys.exit(0)
     if code == 200 and data.get("status") == "replay":
         print(
@@ -424,7 +319,7 @@ def _handle_response(root, url, token, code, data):
             "(submission %s)." % data.get("submissionId", "?")
         )
         print_reverify(data.get("reverify", []))
-        check_for_new_comments(root, url, token, data.get("submissionId", ""))
+        print("Run /papertrail:check to see any instructor feedback.")
         sys.exit(0)
     die(
         "Classroom server returned an unexpected %s response: %s"
@@ -469,7 +364,7 @@ def main():
     if not (root / "plans" / "master-plan.md").is_file():
         die("no plans/master-plan.md found — run /papertrail:init first")
 
-    cfg = read_classroom_config(root)
+    cfg = classroom.read_classroom_config(root)
 
     if args.dry_run:
         course_id = (
@@ -497,7 +392,7 @@ def main():
         )
 
     if args.url or args.token or args.course_id is not None:
-        write_classroom_config(
+        classroom.write_classroom_config(
             root, {"serverUrl": url, "token": token, "courseId": course_id}
         )
 
@@ -506,7 +401,7 @@ def main():
         print("submit: pre-flight warning: %s" % w, file=sys.stderr)
 
     envelope = build_envelope(root, course_id, payload=payload)
-    submit_envelope(root, url, token, envelope)
+    submit_envelope(url, token, envelope)
 
 
 if __name__ == "__main__":
