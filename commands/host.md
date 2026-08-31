@@ -27,6 +27,7 @@ Run and manage the instructor's classroom roster server: one Vercel project, sha
      - `BOARD_SESSION_SECRET` — a fresh random value, e.g. `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`. Never shown or reused elsewhere.
      - `ROSTER_TOKEN_PEPPER` — a second, independent fresh random value, same command. This is **not** the same secret as `BOARD_SESSION_SECRET` — it peppers student bearer-token hashes, a completely different purpose from the instructor's cookie signing key. Generate it separately.
      - `COURSE_ID` (optional) — a short id shown in the roster payload's `course.id`, e.g. `soc-501-fa26`.
+     - `COURSE_INSTRUCTOR_NAME` (optional, recommended) — the name that pre-fills the comment-author field when you drill into a student's board, e.g. `Prof. Kim`. There is only one instructor login, so a blank author field is pure friction — and a blank field silently disables the **Save comment** button, so the first comment from a fresh browser looks like it saved when it did not. Set this and every comment you leave is attributed to it (still editable per-comment on the board).
      `BLOB_READ_WRITE_TOKEN` is set automatically when the Blob store is connected — do not set it manually.
    - **Enable firewall rate limiting** on the `/api/login` route in the project's Vercel Firewall settings, exactly as `--publish-web` requires. Do not deploy until this is enabled.
    - **First deploy.** `npx vercel deploy --prod --yes` from `plans-admin/.classroom-web/`.

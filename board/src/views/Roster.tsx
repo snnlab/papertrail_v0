@@ -222,9 +222,11 @@ function StudentError({
 function StudentBoard({
   submissions,
   onBack,
+  defaultReviewer,
 }: {
   submissions: StudentSubmission[];
   onBack: () => void;
+  defaultReviewer?: string;
 }) {
   const [idx, setIdx] = useState(0);
   const sub = submissions[Math.min(idx, submissions.length - 1)] ?? null;
@@ -241,8 +243,11 @@ function StudentBoard({
   // (fetch/post wiring, reviewer-name persistence, save-state banners)
   // unmodified.
   const boardData = useMemo(
-    () => (sub ? { ...sub.payload, mode: "hosted" as const } : null),
-    [sub],
+    () =>
+      sub
+        ? { ...sub.payload, mode: "hosted" as const, defaultReviewer: sub.payload.defaultReviewer ?? defaultReviewer }
+        : null,
+    [sub, defaultReviewer],
   );
 
   return (
@@ -383,7 +388,11 @@ export default function Roster({ data }: { data: RosterData }) {
           </div>
         )}
         {studentState.status === "ready" && (
-          <StudentBoard submissions={studentState.data.submissions} onBack={backToRoster} />
+          <StudentBoard
+            submissions={studentState.data.submissions}
+            onBack={backToRoster}
+            defaultReviewer={data.course.instructorName ?? undefined}
+          />
         )}
       </>
     );

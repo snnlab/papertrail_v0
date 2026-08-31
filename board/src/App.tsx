@@ -271,10 +271,16 @@ export default function App({ data }: { data: BoardData }) {
   // under webKey so a republish doesn't blank the name field.
   const [reviewer, setReviewer] = useState<string>(() => {
     if (!remote && !hosted) return "";
+    // A name the reviewer already typed on this device wins; otherwise fall
+    // back to data.defaultReviewer (hosted: the roster server's
+    // COURSE_INSTRUCTOR_NAME) so the Save button is not silently disabled on
+    // the very first comment. `|| `, not `?? `, so a stored empty string
+    // (an earlier visit that never named itself) also takes the default.
     try {
-      return localStorage.getItem(hosted ? `${webKey}:name` : `${storageKey}:reviewer`) ?? "";
+      const stored = localStorage.getItem(hosted ? `${webKey}:name` : `${storageKey}:reviewer`);
+      return (stored && stored.trim()) || data.defaultReviewer || "";
     } catch {
-      return "";
+      return data.defaultReviewer || "";
     }
   });
 

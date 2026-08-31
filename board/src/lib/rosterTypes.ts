@@ -17,7 +17,10 @@ import type { BoardData, OutputScore } from "./types";
 
 export interface RosterData {
   schemaVersion: number;
-  course: { id: string; name?: string };
+  // `instructorName` (from the server's COURSE_INSTRUCTOR_NAME) pre-fills the
+  // comment-author field when the instructor drills into a student's board.
+  // null/absent -> the field starts empty, as before.
+  course: { id: string; name?: string; instructorName?: string | null };
   generatedAt: string;
   students: RosterRow[];
 }

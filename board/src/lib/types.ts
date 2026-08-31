@@ -17,6 +17,10 @@ export interface BoardData {
   // board.py --seed-annotations; resolved to anchors in the browser on mount.
   seededAnnotations?: SeededAnnotation[];
   shareHash?: string; // remote mode: Python-computed, echoed back in feedback
+  // hosted mode: pre-fills the comment-author field when it would otherwise
+  // start blank (the roster server passes its COURSE_INSTRUCTOR_NAME here).
+  // A value the reviewer has already typed on this device still wins.
+  defaultReviewer?: string;
   projectId?: string; // live: stable server identity (draft storage + reconnect)
   boardToken?: string; // live: per-boot token required on mutating routes
   bootId?: string; // live: per-boot identity seeding the reconnect baseline (excluded from generation)

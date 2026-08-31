@@ -115,7 +115,15 @@ export async function run(
       status: 200,
       json: {
         schemaVersion: 1,
-        course: { id: env.COURSE_ID ?? "course" },
+        course: {
+          id: env.COURSE_ID ?? "course",
+          // Shown as the default comment author when the instructor drills
+          // into a student's board — one login, one commenter, so the name
+          // field should not start blank (a blank field silently disables
+          // the Save button). Optional: unset -> the field still works, it
+          // just starts empty as before.
+          instructorName: env.COURSE_INSTRUCTOR_NAME ?? null,
+        },
         generatedAt,
         students,
       },

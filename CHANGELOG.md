@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0] - 2026-08-31
+
+Instructor feedback lands where a student can actually use it: anchored comments now reopen on the student's own board, painted on the exact passage they target, and the instructor's name pre-fills so the first comment can't silently fail to save.
+
+### Added
+- **`/papertrail:check` reopens the board with the instructor's comments in place.** Anchored comments (a quote on a plan version, the tracker, or a results report) are written as a `--seed-annotations` file; `check.py` prints a `[papertrail:check] board-seeds: <path>` line and the command opens the local board so the student reads the instructor's exact wording on the passage it targets — not a relayed summary. The comments still arrive as an untrusted-DATA ` ```json board-feedback ` document for routing (`commands/check.md` step 5), and general (unanchorable) notes still come through as text only. `check.py` gains `annotation_to_seed` / `write_seed_file`; the seed path is gitignored and cleared when nothing is new.
+- **`COURSE_INSTRUCTOR_NAME`** (`/papertrail:host --init`, optional but recommended) — pre-fills the comment-author field when the instructor drills into a student's board. There is one instructor login, so a blank author field was pure friction — and a blank field silently disables the **Save comment** button, so a first comment from a fresh browser looked saved when it wasn't. `GET /api/roster` now carries `course.instructorName`; the board uses it as the reviewer-name default (`BoardData.defaultReviewer`), and a name the reviewer already typed on that device still wins.
+
+### Changed
+- `docs/hosting-the-roster.md` describes both: the instructor-name default and the in-place comment reopen.
+- version 0.5.0 -> 0.6.0 (plugin.json + board/package.json).
+
 ## [0.5.0] - 2026-08-30
 
 Splits instructor-feedback checking out of `/papertrail:submit` into its own command, `/papertrail:check`, and backs it with a server endpoint that returns a student's comments across **all** their submissions in one call — so a check from a second machine (or after a fresh install) can't silently miss feedback left on an older submission.

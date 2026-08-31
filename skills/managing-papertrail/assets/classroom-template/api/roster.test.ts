@@ -48,6 +48,16 @@ describe("GET /api/roster", () => {
     expect(body.students).toEqual([]);
   });
 
+  it("carries course.instructorName from COURSE_INSTRUCTOR_NAME (null when unset)", async () => {
+    list.mockResolvedValue({ blobs: [], hasMore: false });
+    get.mockResolvedValue(null);
+    const bare = (await run("GET", authedHeaders(), undefined, ENV, NOW)).json as { course: Record<string, unknown> };
+    expect(bare.course.instructorName).toBeNull();
+    const named = (await run("GET", authedHeaders(), undefined, { ...ENV, COURSE_INSTRUCTOR_NAME: "Prof. Kim" }, NOW))
+      .json as { course: Record<string, unknown> };
+    expect(named.course.instructorName).toBe("Prof. Kim");
+  });
+
   it("builds a roster row with lastSubmission null when a student has never submitted", async () => {
     list.mockImplementation(async (opts: { prefix: string }) => {
       if (opts.prefix === "roster/") return { blobs: [{ pathname: "roster/alice.json" }], hasMore: false };

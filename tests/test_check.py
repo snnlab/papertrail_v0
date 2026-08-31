@@ -130,6 +130,60 @@ class TestCheck(unittest.TestCase):
             inbox = classroom.comments_inbox_dir(root)
             self.assertEqual(list(inbox.glob("*.txt")), [])
 
+    PLAN_COMMENT = {
+        "id": "p1", "clientId": "z", "author": "Prof. Kim", "shareHash": "sh1",
+        "docHash": "abcd1234", "receivedAt": "2026-08-25T04:00:00.000Z",
+        "annotation": {
+            "type": "plan-comment", "planPath": "plans/execution/02-clpm-fit/v1.md",
+            "component": "02-clpm-fit", "version": 1, "isDraft": False,
+            "sectionHeading": "Decisions and reasons",
+            "quote": "the random-intercept specification",
+            "comment": "expand this — why random intercepts specifically?",
+        },
+    }
+
+    def test_anchored_comment_writes_seed_file_and_marker(self):
+        with self._project() as root:
+            self._configure(root, comments=[self.PLAN_COMMENT])
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                check.main()
+            text = out.getvalue()
+            self.assertIn("[papertrail:check] board-seeds:", text)
+            self.assertIn("[papertrail:check] focus: 02-clpm-fit", text)
+            seed_path = root / "plans" / check.SEED_FILE_NAME
+            self.assertTrue(seed_path.is_file())
+            import json as _json
+            seeds = _json.loads(seed_path.read_text())
+            self.assertEqual(len(seeds), 1)
+            s = seeds[0]
+            self.assertEqual(s["scope"], "plan")
+            self.assertEqual(s["component"], "02-clpm-fit")
+            self.assertEqual(s["version"], 1)
+            self.assertEqual(s["quote"], "the random-intercept specification")
+            self.assertEqual(s["author"], "Prof. Kim")
+            # every seed board.py can render
+            self.assertTrue(board._valid_seed(s))
+            # the text-document routing path still ran for the same comment
+            self.assertIn('"mode": "hosted"', text)
+            self.assertEqual(classroom.read_pulled_comment_ids(root), {"p1"})
+
+    def test_general_only_comments_write_no_seed_file(self):
+        with self._project() as root:
+            self._configure(root)  # COMMENTS are all type "general"
+            with contextlib.redirect_stdout(io.StringIO()):
+                check.main()
+            self.assertFalse((root / "plans" / check.SEED_FILE_NAME).is_file())
+
+    def test_stale_seed_file_cleared_when_nothing_new(self):
+        with self._project() as root:
+            self._configure(root, comments=[])
+            stale = root / "plans" / check.SEED_FILE_NAME
+            stale.write_text("[]", encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                check.main()
+            self.assertFalse(stale.is_file())
+
     def test_second_check_skips_already_pulled(self):
         with self._project() as root:
             self._configure(root)
