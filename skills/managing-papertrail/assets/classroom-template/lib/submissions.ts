@@ -73,18 +73,34 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(normalize(value));
 }
 
-// Compares everything the CLIENT controls, not server-added bookkeeping:
-// `serverReceivedAt` varies by request time, and `reverify` is freshly
-// recomputed on every POST before this comparison ever runs (see
-// api/submissions.ts) — a replay must return the PREVIOUSLY computed
-// reverify result, not the fresh one, so it is excluded from the equality
-// check and read back from the stored (pre-existing) record instead.
+// A submission is IDENTIFIED by its graded content. The `idempotencyKey` is
+// submit.py's `share_hash` — a sha256 over master-plan + decision-log +
+// every plan version + draft snapshots + results bundles + reviews +
+// history + archives, i.e. exactly `payload.files`. Everything else in the
+// stored record is send-context that a well-behaved client legitimately
+// varies between two sends of the same work, and MUST NOT turn a plain
+// resend into a `conflict`:
+//   - `serverReceivedAt` / `reverify` — server-added; `reverify` is
+//     recomputed on every POST and a replay returns the STORED result.
+//   - `submittedAt` / `payload.generatedAt` — wall clock at send time.
+//   - `gitExcerpt` / `payload.git` — the commit log / HEAD / per-file
+//     commit dates at send time; any commit (even outside `plans/`) moves
+//     HEAD. A plan file that actually changed already changes the
+//     `idempotencyKey` (and thus the storage key), so a same-key resend
+//     means the graded files are byte-identical.
+//   - `payload.mode` / `focus` / `schemaVersion` / `detailLevel` /
+//     `modelProfile` / `project` — not covered by the content hash.
+// So the comparison is exactly the hash's domain, plus `courseId` (which is
+// identifying but not in the hash). This keeps `conflict` reachable only by
+// a genuine sha256 collision or a client that fakes the key — the case the
+// 409 branch in api/submissions.ts was actually added for.
 function sameSubmissionContent(a: StoredSubmission, b: StoredSubmission): boolean {
-  const strip = (s: StoredSubmission) => {
-    const { serverReceivedAt: _s, reverify: _r, ...rest } = s;
-    return rest;
-  };
-  return canonicalJson(strip(a)) === canonicalJson(strip(b));
+  const identity = (s: StoredSubmission) => ({
+    courseId: s.courseId,
+    idempotencyKey: s.idempotencyKey,
+    files: (s.payload as { files?: unknown })?.files ?? null,
+  });
+  return canonicalJson(identity(a)) === canonicalJson(identity(b));
 }
 
 export type PutSubmissionResult =

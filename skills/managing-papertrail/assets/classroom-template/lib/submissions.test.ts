@@ -63,12 +63,37 @@ describe("putSubmission", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  it("flags a conflict when the same key carries different client-controlled content", async () => {
-    const original = submission();
+  it("replays a plain resend of unchanged work — only send-context differs", async () => {
+    const original = submission({
+      payload: { schemaVersion: 2, generatedAt: "2026-08-20T10:00:00+09:00", files: { masterPlan: { path: "plans/master-plan.md", content: "X" } } },
+    });
     get.mockResolvedValue({ statusCode: 200, stream: streamOf(original) });
-    const different = submission({ courseId: "different-course" });
-    const result = await putSubmission(TOKEN, "alice", original.idempotencyKey, different);
-    expect(result.outcome).toBe("conflict");
+    const resend = submission({
+      submittedAt: "2026-08-25T09:30:00.000Z",
+      gitExcerpt: { available: true, head: "abc123", branch: "main", commits: [
+        { hash: "abc123", authorDate: "2026-08-24", author: "Alice", subject: "unrelated commit" },
+      ] },
+      payload: { schemaVersion: 2, generatedAt: "2026-08-25T09:30:00+09:00", git: { head: "abc123" }, files: { masterPlan: { path: "plans/master-plan.md", content: "X" } } },
+    });
+    const result = await putSubmission(TOKEN, "alice", original.idempotencyKey, resend);
+    expect(result.outcome).toBe("replay");
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("flags a conflict when the same key carries different graded files", async () => {
+    const original = submission({ payload: { files: { masterPlan: { path: "plans/master-plan.md", content: "ORIGINAL" } } } });
+    get.mockResolvedValue({ statusCode: 200, stream: streamOf(original) });
+    const differentFiles = submission({ payload: { files: { masterPlan: { path: "plans/master-plan.md", content: "TAMPERED" } } } });
+    expect((await putSubmission(TOKEN, "alice", original.idempotencyKey, differentFiles)).outcome).toBe("conflict");
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("flags a conflict when the same key+files carry a different courseId", async () => {
+    const files = { masterPlan: { path: "plans/master-plan.md", content: "ORIGINAL" } };
+    const original = submission({ courseId: "soc-501", payload: { files } });
+    get.mockResolvedValue({ statusCode: 200, stream: streamOf(original) });
+    const differentCourse = submission({ courseId: "other-course", payload: { files } });
+    expect((await putSubmission(TOKEN, "alice", original.idempotencyKey, differentCourse)).outcome).toBe("conflict");
     expect(put).not.toHaveBeenCalled();
   });
 

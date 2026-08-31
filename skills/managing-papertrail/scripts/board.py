@@ -196,6 +196,11 @@ def git_info(root, paths):
 
 
 def read_file(root, rel):
+    # Always emit POSIX-style paths in the payload — the board UI, hosted
+    # comment anchoring (docKey), share_hash, and the classroom server's
+    # reverify all key on forward-slash paths. On Windows str(Path.relative_to)
+    # yields backslashes, which e.g. break reverify's git-timing slug match.
+    rel = str(rel).replace("\\", "/")
     p = root / rel
     return {"path": rel, "content": p.read_text(encoding="utf-8", errors="replace")}
 
@@ -279,7 +284,7 @@ def collect_results(root, comp_dir):
             manifest = None
         bundle = {
             "resultsVersion": int(m.group(1)),
-            "dir": str(rdir.relative_to(root)),
+            "dir": rdir.relative_to(root).as_posix(),
             "manifest": manifest,
             "manifestRaw": read_file(root, str(manifest_p.relative_to(root))),
             "report": None,
@@ -1719,7 +1724,7 @@ def serve(root, payload, args):
                         fresh = {
                             "component": comp,
                             "proposedVersion": nd[0],
-                            "path": str(nd[1].relative_to(root)),
+                            "path": nd[1].relative_to(root).as_posix(),
                             "content": fresh_text,
                             "contentHash": hashlib.sha256(
                                 fresh_text.encode("utf-8")).hexdigest(),

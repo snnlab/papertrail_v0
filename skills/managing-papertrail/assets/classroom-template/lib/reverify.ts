@@ -475,8 +475,11 @@ function parseSignedTrailerLine(line: string): { name: string; date: string } | 
 // real match) are more likely than false positives.
 function commitsTouchingPath(
   commits: { hash: string; authorDate: string; authorName: string | null; subject: string; files?: string[] }[],
-  path: string,
+  rawPath: string,
 ): typeof commits {
+  // Defend against a client that sent Windows-style separators (older
+  // board.py on Windows did): the slug/basename split below is "/"-only.
+  const path = rawPath.replace(/\\/g, "/");
   const base = path.split("/").pop() ?? path;
   const withFiles = commits.filter((c) => Array.isArray(c.files));
   if (withFiles.length > 0) {
