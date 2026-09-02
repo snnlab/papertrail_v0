@@ -235,7 +235,7 @@ def main():
         file_path = tool_input.get("file_path", "")
         cwd = event.get("cwd") or os.getcwd()
     except Exception:
-        if "/plans/execution/" in raw:
+        if "/plans/execution/" in raw.replace("\\\\", "/").replace("\\", "/"):
             print(
                 "papertrail gate: unparseable hook payload, write not gated",
                 file=sys.stderr,
@@ -249,10 +249,15 @@ def main():
     if not p.is_absolute():
         p = Path(cwd) / p
     p = Path(os.path.realpath(str(p)))
+    # Match path-shape regexes against a forward-slash rendering so they work
+    # on Windows too (str(WindowsPath) uses backslashes; RESULTS_RE and the
+    # bundle-dir slice below are written with "/"). as_posix() keeps the drive
+    # letter, which Path() round-trips fine.
+    p_posix = p.as_posix()
 
     # ---- Results-bundle immutability (synchronous file policy; NEVER opens
     # the board — a browser gate here would deadlock capture). ----
-    res_m = RESULTS_RE.search(str(p))
+    res_m = RESULTS_RE.search(p_posix)
     if res_m:
         if _env("NO_GATE", "") == "1":
             print(
@@ -263,7 +268,7 @@ def main():
             sys.exit(0)
         if find_project_root(p) is None:
             sys.exit(0)
-        bundle_dir = Path(str(p)[: res_m.end()].rstrip("/"))
+        bundle_dir = Path(p_posix[: res_m.end()].rstrip("/"))
         if p.name == "verdict.json" and p.parent == bundle_dir:
             if tool_name == "Write" and not p.exists():
                 allow(
