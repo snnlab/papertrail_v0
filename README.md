@@ -146,7 +146,7 @@ PaperTrail은 특정한 작업에 적합하지, AI를 만지는 모든 사람을
 Claude Code에서:
 
 ```
-/plugin marketplace add DS3693/papertrail
+/plugin marketplace add snnlab/papertrail_v0
 /plugin install papertrail@papertrail
 ```
 

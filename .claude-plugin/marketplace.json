@@ -3,7 +3,7 @@
   "description": "A plan-based bridge between graduate students and their instructor for quantitative-methods coursework.",
   "owner": {
     "name": "PaperTrail contributors",
-    "url": "https://github.com/DS3693/papertrail"
+    "url": "https://github.com/snnlab/papertrail_v0"
   },
   "plugins": [
     {

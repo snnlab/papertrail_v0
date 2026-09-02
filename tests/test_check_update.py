@@ -151,15 +151,15 @@ class TestChangelog(unittest.TestCase):
 
 class TestMarketplaceResolution(unittest.TestCase):
     def test_finds_marketplace_by_repo(self):
-        known = {"my-mkt": {"source": {"source": "github", "repo": "DS3693/papertrail"}}}
+        known = {"my-mkt": {"source": {"source": "github", "repo": "snnlab/papertrail_v0"}}}
         self.assertEqual(cu.resolve_marketplace_name(known), "my-mkt")
 
     def test_case_insensitive_repo_match(self):
-        known = {"campus-mkt": {"source": {"repo": "DS3693/PaperTrail"}}}
+        known = {"campus-mkt": {"source": {"repo": "snnlab/PaperTrail_v0"}}}
         self.assertEqual(cu.resolve_marketplace_name(known), "campus-mkt")
 
     def test_supports_marketplaces_wrapper_key(self):
-        known = {"marketplaces": {"campus-mkt": {"source": {"repo": "DS3693/papertrail"}}}}
+        known = {"marketplaces": {"campus-mkt": {"source": {"repo": "snnlab/papertrail_v0"}}}}
         self.assertEqual(cu.resolve_marketplace_name(known), "campus-mkt")
 
     def test_fallback_when_absent(self):
@@ -219,8 +219,8 @@ class TestMain(unittest.TestCase):
         )
         return root
 
-    MANIFEST_URL = "https://raw.githubusercontent.com/DS3693/papertrail/main/.claude-plugin/plugin.json"
-    CHANGELOG_URL = "https://raw.githubusercontent.com/DS3693/papertrail/main/CHANGELOG.md"
+    MANIFEST_URL = "https://raw.githubusercontent.com/snnlab/papertrail_v0/main/.claude-plugin/plugin.json"
+    CHANGELOG_URL = "https://raw.githubusercontent.com/snnlab/papertrail_v0/main/CHANGELOG.md"
 
     def test_notifies_when_newer_available(self):
         with tempfile.TemporaryDirectory() as d:

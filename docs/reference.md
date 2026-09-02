@@ -160,7 +160,7 @@ Plus a short marked section in your project's `CLAUDE.md` so every future sessio
 In Claude Code:
 
 ```
-/plugin marketplace add DS3693/papertrail
+/plugin marketplace add snnlab/papertrail_v0
 /plugin install papertrail@papertrail
 ```
 
@@ -197,7 +197,7 @@ Create `pt-pinned/.claude-plugin/marketplace.json` — this example pins `v0.1.0
   "plugins": [
     {
       "name": "papertrail",
-      "source": { "source": "github", "repo": "DS3693/papertrail", "ref": "v0.1.0" }
+      "source": { "source": "github", "repo": "snnlab/papertrail_v0", "ref": "v0.1.0" }
     }
   ]
 }

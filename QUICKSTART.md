@@ -9,7 +9,7 @@ Throughout, we'll use a running example from a sociology quantitative-methods co
 In any Claude Code session:
 
 ```
-/plugin marketplace add DS3693/papertrail
+/plugin marketplace add snnlab/papertrail_v0
 /plugin install papertrail@papertrail
 ```
 

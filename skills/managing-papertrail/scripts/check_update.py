@@ -102,7 +102,7 @@ def parse_changelog_highlights(text, limit=3):
     return highlights
 
 
-def resolve_marketplace_name(known, repo="DS3693/papertrail", fallback="papertrail"):
+def resolve_marketplace_name(known, repo="snnlab/papertrail_v0", fallback="papertrail"):
     if not isinstance(known, dict):
         return fallback
     entries = known.get("marketplaces", known)
@@ -140,10 +140,10 @@ def build_output(notice):
 
 
 REMOTE_MANIFEST_URL = (
-    "https://raw.githubusercontent.com/DS3693/papertrail/main/.claude-plugin/plugin.json"
+    "https://raw.githubusercontent.com/snnlab/papertrail_v0/main/.claude-plugin/plugin.json"
 )
 REMOTE_CHANGELOG_URL = (
-    "https://raw.githubusercontent.com/DS3693/papertrail/main/CHANGELOG.md"
+    "https://raw.githubusercontent.com/snnlab/papertrail_v0/main/CHANGELOG.md"
 )
 
 
