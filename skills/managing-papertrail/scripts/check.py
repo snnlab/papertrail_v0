@@ -31,6 +31,8 @@ error (no classroom server configured yet).
 """
 
 import json
+import os
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -55,8 +57,46 @@ from board import (  # noqa: E402
     group_comments,
     assemble_hosted_document,
     inspect_feedback_document,
+    request_shutdown,
     _http_get_json,
 )
+
+
+def open_seed_board(root, seed_path, focus):
+    """Open the local board on the instructor's anchored comments, painted in
+    place. Detached: /papertrail:check returns right away and the board runs on
+    its own — it is a viewer here, the routing already happened via the
+    board-feedback document(s) printed above. Set PAPERTRAIL_NO_BOARD=1 to skip
+    (tests, headless runs)."""
+    if os.environ.get("PAPERTRAIL_NO_BOARD"):
+        return
+    board_py = Path(__file__).resolve().parent / "board.py"
+    # Release a board already holding plans/.board.lock so the seeded reopen
+    # does not fail with "another board is open".
+    try:
+        request_shutdown(root / "plans")
+    except Exception:
+        pass
+    cmd = [sys.executable, str(board_py), "--seed-annotations", str(seed_path)]
+    if focus:
+        cmd += ["--focus", focus]
+    kwargs = {"stdin": subprocess.DEVNULL,
+              "stdout": subprocess.DEVNULL,
+              "stderr": subprocess.DEVNULL}
+    if os.name == "nt":
+        kwargs["creationflags"] = (
+            getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            | getattr(subprocess, "DETACHED_PROCESS", 0)
+        )
+    else:
+        kwargs["start_new_session"] = True
+    try:
+        subprocess.Popen(cmd, **kwargs)
+        print("[papertrail:check] opening the board with the instructor's "
+              "comments painted in place…")
+    except OSError as e:
+        print("[papertrail:check] could not open the board (%s) — run "
+              "/papertrail:board to see the comments." % e, file=sys.stderr)
 
 
 def die(msg, code=1):
@@ -224,6 +264,12 @@ def main():
     for inbox_path, doc in docs:
         inspect_feedback_document(root, doc)  # route (prints)
         inbox_path.unlink()
+
+    # Anchored comments were written to a seed file above — open the board on
+    # them now so the student sees the instructor's words in place without a
+    # separate step.
+    if seeds:
+        open_seed_board(root, seed_path, focus)
 
 
 if __name__ == "__main__":

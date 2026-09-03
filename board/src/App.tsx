@@ -374,6 +374,19 @@ export default function App({ data }: { data: BoardData }) {
 
   const isTouch = hosted && !!window.matchMedia?.("(pointer: coarse)")?.matches;
 
+  // Hosted mode (the instructor drilled into a student's board): a new comment
+  // posts to the server the moment it is added, so the instructor never has to
+  // hunt for a second "Save" per card. The FeedbackPanel per-card Save stays as
+  // a retry affordance if this POST fails or the reviewer name was still blank.
+  // Refs so the add* callbacks below can stay dep-free.
+  const saveHostedRef = useRef(saveHosted);
+  saveHostedRef.current = saveHosted;
+  const hostedRef = useRef(hosted);
+  hostedRef.current = hosted;
+  const autoPostHosted = useCallback((a: Annotation) => {
+    if (hostedRef.current) void saveHostedRef.current(a);
+  }, []);
+
   useEffect(() => {
     if (!canAnnotate) return;
     try {
@@ -402,57 +415,52 @@ export default function App({ data }: { data: BoardData }) {
 
   const addPlanComment = useCallback(
     (a: Omit<PlanCommentAnnotation, "id" | "type">) => {
-      setAnnotations((prev) => [
-        ...prev,
-        { ...a, id: nextId(), type: "plan-comment" },
-      ]);
+      const ann: Annotation = { ...a, id: nextId(), type: "plan-comment" };
+      setAnnotations((prev) => [...prev, ann]);
       setDrawerOpen(true);
+      autoPostHosted(ann);
     },
-    [],
+    [autoPostHosted],
   );
 
   const addResultComment = useCallback(
     (a: Omit<ResultCommentAnnotation, "id" | "type">) => {
-      setAnnotations((prev) => [
-        ...prev,
-        { ...a, id: nextId(), type: "result-comment" },
-      ]);
+      const ann: Annotation = { ...a, id: nextId(), type: "result-comment" };
+      setAnnotations((prev) => [...prev, ann]);
       setDrawerOpen(true);
+      autoPostHosted(ann);
     },
-    [],
+    [autoPostHosted],
   );
 
   const addScriptComment = useCallback(
     (a: Omit<ScriptCommentAnnotation, "id" | "type">) => {
-      setAnnotations((prev) => [
-        ...prev,
-        { ...a, id: nextId(), type: "script-comment" },
-      ]);
+      const ann: Annotation = { ...a, id: nextId(), type: "script-comment" };
+      setAnnotations((prev) => [...prev, ann]);
       setDrawerOpen(true);
+      autoPostHosted(ann);
     },
-    [],
+    [autoPostHosted],
   );
 
   const addDocComment = useCallback(
     (a: Omit<DocCommentAnnotation, "id" | "type">) => {
-      setAnnotations((prev) => [
-        ...prev,
-        { ...a, id: nextId(), type: "doc-comment" },
-      ]);
+      const ann: Annotation = { ...a, id: nextId(), type: "doc-comment" };
+      setAnnotations((prev) => [...prev, ann]);
       setDrawerOpen(true);
+      autoPostHosted(ann);
     },
-    [],
+    [autoPostHosted],
   );
 
   const addGeneral = useCallback(
     (view: string, comment: string, category?: "integrity") => {
-      setAnnotations((prev) => [
-        ...prev,
-        { id: nextId(), type: "general", view, comment, category },
-      ]);
+      const ann: Annotation = { id: nextId(), type: "general", view, comment, category };
+      setAnnotations((prev) => [...prev, ann]);
       setDrawerOpen(true);
+      autoPostHosted(ann);
     },
-    [],
+    [autoPostHosted],
   );
 
   const removeAnnotation = useCallback((id: string) => {

@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Student search on the roster dashboard.** A search box filters the roster table by student name or id as you type — for a class where scrolling a long table to find one student is friction.
+
+### Changed
+- **Instructor comments post as you leave them.** In the drilled-in student board (hosted mode) a new comment now goes to the server the moment it is added — no second per-card **Save** click. Pressing Return in the comment box commits it (Shift+Return for a newline); the per-card Save stays only as a retry affordance if the POST fails or the reviewer name is still blank.
+- **`/papertrail:check` opens the board itself.** When there are anchored instructor comments, `check.py` now launches the local board (detached) on the seed file directly — releasing any board already holding `plans/.board.lock` first — instead of relying on a separate command step. Prints `[papertrail:check] opening the board…`; set `PAPERTRAIL_NO_BOARD=1` to suppress (headless runs).
+
 ## [0.6.0] - 2026-08-31
 
 Instructor feedback lands where a student can actually use it: anchored comments now reopen on the student's own board, painted on the exact passage they target, and the instructor's name pre-fills so the first comment can't silently fail to save.

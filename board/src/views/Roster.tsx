@@ -311,15 +311,21 @@ function StudentBoard({
 export default function Roster({ data }: { data: RosterData }) {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<{ studentId: string; displayName: string } | null>(
     null,
   );
   const [studentState, setStudentState] = useState<StudentFetchState>({ status: "loading" });
 
-  const rows = useMemo(
-    () => sortRows(data.students, sortKey, sortDir),
-    [data.students, sortKey, sortDir],
-  );
+  const rows = useMemo(() => {
+    const sorted = sortRows(data.students, sortKey, sortDir);
+    const q = query.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter(
+      (r) =>
+        r.displayName.toLowerCase().includes(q) || r.studentId.toLowerCase().includes(q),
+    );
+  }, [data.students, sortKey, sortDir, query]);
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -408,7 +414,27 @@ export default function Roster({ data }: { data: RosterData }) {
         </div>
       ) : (
         <section className="rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900">
+          <div className="border-b border-stone-200 dark:border-stone-800 p-2">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search students by name…"
+              aria-label="Search students by name"
+              className="w-full max-w-xs rounded-md border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-2.5 py-1.5 text-sm outline-none focus:border-stone-500 dark:focus:border-stone-400"
+            />
+            {query.trim() && (
+              <span className="ml-2 text-xs text-stone-400 dark:text-stone-500">
+                {rows.length} of {data.students.length}
+              </span>
+            )}
+          </div>
           <div className="overflow-x-auto">
+            {rows.length === 0 ? (
+              <p className="p-6 text-center text-sm text-stone-400 dark:text-stone-500">
+                No student matches "{query.trim()}".
+              </p>
+            ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-stone-200 dark:border-stone-800 text-left text-xs uppercase tracking-wide text-stone-500">
@@ -531,6 +557,7 @@ export default function Roster({ data }: { data: RosterData }) {
                 })}
               </tbody>
             </table>
+            )}
           </div>
         </section>
       )}

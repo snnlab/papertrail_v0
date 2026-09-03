@@ -52,12 +52,18 @@ class TestCheck(unittest.TestCase):
         self._orig_data = os.environ.get("CLAUDE_PLUGIN_DATA")
         self._orig_http_get_json = check._http_get_json
         self._orig_cwd = os.getcwd()
+        self._orig_no_board = os.environ.get("PAPERTRAIL_NO_BOARD")
+        os.environ["PAPERTRAIL_NO_BOARD"] = "1"  # never spawn a real board from a test
 
     def tearDown(self):
         if self._orig_data is None:
             os.environ.pop("CLAUDE_PLUGIN_DATA", None)
         else:
             os.environ["CLAUDE_PLUGIN_DATA"] = self._orig_data
+        if self._orig_no_board is None:
+            os.environ.pop("PAPERTRAIL_NO_BOARD", None)
+        else:
+            os.environ["PAPERTRAIL_NO_BOARD"] = self._orig_no_board
         check._http_get_json = self._orig_http_get_json
 
     @contextlib.contextmanager
@@ -174,6 +180,47 @@ class TestCheck(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 check.main()
             self.assertFalse((root / "plans" / check.SEED_FILE_NAME).is_file())
+
+    def test_anchored_comment_opens_the_board(self):
+        calls = []
+        orig = check.open_seed_board
+        check.open_seed_board = lambda root, seed_path, focus: calls.append(
+            (Path(seed_path).name, focus)
+        )
+        try:
+            with self._project() as root:
+                self._configure(root, comments=[self.PLAN_COMMENT])
+                with contextlib.redirect_stdout(io.StringIO()):
+                    check.main()
+        finally:
+            check.open_seed_board = orig
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0], (check.SEED_FILE_NAME, "02-clpm-fit"))
+
+    def test_general_only_comments_do_not_open_the_board(self):
+        calls = []
+        orig = check.open_seed_board
+        check.open_seed_board = lambda *a: calls.append(a)
+        try:
+            with self._project() as root:
+                self._configure(root)  # all type "general" — no anchor, no seed
+                with contextlib.redirect_stdout(io.StringIO()):
+                    check.main()
+        finally:
+            check.open_seed_board = orig
+        self.assertEqual(calls, [])
+
+    def test_no_board_env_suppresses_spawn(self):
+        # open_seed_board is the real one here; PAPERTRAIL_NO_BOARD=1 (setUp)
+        # must make it a no-op rather than launch board.py.
+        with self._project() as root:
+            self._configure(root, comments=[self.PLAN_COMMENT])
+            seed_path = root / "plans" / check.SEED_FILE_NAME
+            with contextlib.redirect_stdout(io.StringIO()):
+                check.main()
+            # got far enough to write the seed file, but nothing was spawned
+            self.assertTrue(seed_path.is_file())
+            check.open_seed_board(root, seed_path, "02-clpm-fit")  # returns immediately
 
     def test_stale_seed_file_cleared_when_nothing_new(self):
         with self._project() as root:

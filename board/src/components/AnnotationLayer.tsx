@@ -175,14 +175,17 @@ export default function AnnotationLayer({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                save();
+              }
               if (e.key === "Escape") {
                 setComposing(false);
                 setPending(null);
                 setIntegrityFlag(false);
               }
             }}
-            placeholder="Your comment… (⌘↵ to save)"
+            placeholder="Your comment… (↵ to save, ⇧↵ for a new line)"
             className="h-20 w-full resize-none rounded border border-stone-200 dark:border-stone-800 p-2 text-sm outline-none focus:border-stone-400 dark:focus:border-stone-500"
           />
           <label className="mt-1.5 flex cursor-pointer items-center gap-1.5 text-[11px] text-stone-500 dark:text-stone-400">
@@ -228,6 +231,13 @@ export function GeneralCommentBox({
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const [integrityFlag, setIntegrityFlag] = useState(false);
+  const commit = () => {
+    if (!text.trim()) return;
+    onAdd(view, text.trim(), integrityFlag ? "integrity" : undefined);
+    setText("");
+    setIntegrityFlag(false);
+    setOpen(false);
+  };
   if (!open) {
     return (
       <button
@@ -247,7 +257,17 @@ export function GeneralCommentBox({
         autoFocus
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={`General comment on the ${view} view…`}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            commit();
+          }
+          if (e.key === "Escape") {
+            setOpen(false);
+            setIntegrityFlag(false);
+          }
+        }}
+        placeholder={`General comment on the ${view} view… (↵ to add)`}
         className="h-16 w-full resize-none rounded border border-stone-200 dark:border-stone-800 p-2 text-sm outline-none focus:border-stone-400 dark:focus:border-stone-500"
       />
       <label className="mt-1.5 flex cursor-pointer items-center gap-1.5 text-[11px] text-stone-500 dark:text-stone-400">
@@ -271,12 +291,7 @@ export function GeneralCommentBox({
         <button
           className="rounded bg-stone-900 dark:bg-stone-200 px-3 py-1 text-xs font-medium text-white dark:text-stone-900 hover:bg-stone-700 dark:hover:bg-stone-400 disabled:opacity-40"
           disabled={!text.trim()}
-          onClick={() => {
-            onAdd(view, text.trim(), integrityFlag ? "integrity" : undefined);
-            setText("");
-            setIntegrityFlag(false);
-            setOpen(false);
-          }}
+          onClick={commit}
         >
           Add to feedback
         </button>
